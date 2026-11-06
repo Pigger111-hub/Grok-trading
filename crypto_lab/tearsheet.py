@@ -35,10 +35,18 @@ def write_tearsheet(equity: pd.Series, benchmark: pd.Series, path: Path, title: 
     )
 
 
-def write_strategy_tearsheet(bars: pd.DataFrame, asset: str, strategy_id: str, params: dict, folder: Path) -> Path:
+def write_strategy_tearsheet(
+    bars: pd.DataFrame,
+    asset: str,
+    strategy_id: str,
+    params: dict,
+    folder: Path,
+    timeframe: str = "1d",
+) -> Path:
     strategy = STRATEGIES_BY_ID[strategy_id]
     result, benchmark = backtest_window(bars, strategy, params, 0, len(bars))
-    path = folder / f"{asset.lower()}_{strategy_id}.html"
+    suffix = "" if timeframe == "1d" else f"_{timeframe}"
+    path = folder / f"{asset.lower()}_{strategy_id}{suffix}.html"
     write_tearsheet(
         result.equity,
         benchmark.equity,

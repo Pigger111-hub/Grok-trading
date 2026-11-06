@@ -57,13 +57,17 @@ def _normalize(points: list[dict]) -> list[dict]:
     return [{"time": point["time"], "value": round(point["value"] / base * 100, 4)} for point in points]
 
 
+def _unix(value) -> int:
+    return int(pd.Timestamp(value).timestamp())
+
+
 def build_payload(conn: sqlite3.Connection, prices: dict[str, pd.DataFrame]) -> dict:
     candles = {}
     for asset, frame in prices.items():
-        recent = frame.iloc[-900:]
+        recent = frame.iloc[-720:]
         candles[asset] = [
             {
-                "time": index.date().isoformat(),
+                "time": _unix(index),
                 "open": round(float(row.open), 2),
                 "high": round(float(row.high), 2),
                 "low": round(float(row.low), 2),
@@ -72,51 +76,70 @@ def build_payload(conn: sqlite3.Connection, prices: dict[str, pd.DataFrame]) -> 
             for index, row in recent.iterrows()
         ]
     markers = []
-    for trade in _records(conn, "SELECT * FROM paper_trades WHERE strategy != 'buy_and_hold' ORDER BY entry_date"):
-        if trade["strategy"] != "sma_filter":
-            continue
-        color = COLORS.get(trade["strategy"], "#ffffff")
+    for trade in _records(
+        conn,
+        "SELECT * FROM paper_trades WHERE strategy = 'sma_filter' ORDER BY entry_date",
+    ):
+        clock = trade.get("timeframe") or "1d"
+        color = "#d6ff4a" if clock == "1d" else COLORS["sma_filter"]
+        label = "รายวัน" if clock == "1d" else "4ชม."
         markers.append(
             {
                 "asset": trade["asset"],
-                "time": trade["entry_date"],
+                "time": _unix(trade["entry_date"]),
                 "position": "belowBar",
                 "color": color,
                 "shape": "arrowUp",
-                "text": "ซื้อ SMA",
+                "text": f"ซื้อ {label}",
             }
         )
         if trade["closed"] and trade["exit_date"]:
             markers.append(
                 {
                     "asset": trade["asset"],
-                    "time": trade["exit_date"],
+                    "time": _unix(trade["exit_date"]),
                     "position": "aboveBar",
                     "color": color,
                     "shape": "arrowDown",
-                    "text": "ขาย SMA",
+                    "text": f"ขาย {label}",
                 }
             )
     paper_equity = {}
-    for row in _records(conn, "SELECT asset, strategy, date, equity FROM paper_equity ORDER BY date"):
-        paper_equity.setdefault(row["asset"], {}).setdefault(row["strategy"], []).append(row)
+    names = {}
+    colors = {}
+    for row in _records(
+        conn,
+        "SELECT asset, timeframe, strategy, date, equity FROM paper_equity ORDER BY date",
+    ):
+        key = f"{row['strategy']}|{row['timeframe']}"
+        paper_equity.setdefault(row["asset"], {}).setdefault(key, []).append(
+            {"date": row["date"], "equity": row["equity"]}
+        )
+        clock = "รายวัน (1d)" if row["timeframe"] == "1d" else "4 ชั่วโมง (4h)"
+        names[key] = f"{NAMES_TH.get(row['strategy'], row['strategy'])} {clock}"
+        colors[key] = "#d6ff4a" if row["strategy"] == "sma_filter" and row["timeframe"] == "1d" else COLORS.get(row["strategy"], "#ffffff")
     equity = {}
     for asset, strategies in paper_equity.items():
-        equity[asset] = {name: _normalize(_series(points)) for name, points in strategies.items()}
+        equity[asset] = {
+            name: _normalize([{"time": _unix(point["date"]), "value": point["equity"]} for point in points])
+            for name, points in strategies.items()
+        }
 
     leaderboard = []
     for row in _records(
         conn,
         """
-        SELECT asset, strategy, total_return, cagr, max_drawdown, sharpe, win_rate, n_trades
+        SELECT asset, timeframe, strategy, total_return, cagr, max_drawdown, sharpe, win_rate, n_trades
         FROM backtest_results
         WHERE experiment = 'oos_default'
-        ORDER BY asset, strategy
+        ORDER BY asset, timeframe, strategy
         """,
     ):
         leaderboard.append(
             {
                 "asset": row["asset"],
+                "timeframe": row["timeframe"],
+                "timeframe_th": "รายวัน (1d)" if row["timeframe"] == "1d" else "4 ชั่วโมง (4h)",
                 "strategy": row["strategy"],
                 "name_th": NAMES_TH.get(row["strategy"], row["strategy"]),
                 "book": "นอกตัวอย่าง (out of sample)",
@@ -155,7 +178,8 @@ def build_payload(conn: sqlite3.Connection, prices: dict[str, pd.DataFrame]) -> 
         "positions": positions,
         "trades": trades,
         "reasons": reasons,
-        "colors": COLORS,
+        "colors": colors,
+        "names": names,
     }
 
 
@@ -244,7 +268,7 @@ HTML = """<!DOCTYPE html>
       <button data-asset="BTC" class="asset">BTC</button>
       <button data-asset="ETH" class="asset">ETH</button>
     </div>
-    <p class="sub">จุดบนกราฟคือเส้น 200 วัน (SMA) เท่านั้น เทรดของ MACD และดอนเชียนอยู่ในตารางขวา</p>
+    <p class="sub">จุดบนกราฟคือเส้น 200 แท่งเท่านั้น สีเหลืองคือรายวัน (1d) สีเขียวคือ 4 ชั่วโมง (4h) ไม่มีกรอบ 1 ชั่วโมง</p>
     <div id="price" class="chart"></div>
     <h2 style="margin-top:12px">สถานะกระดาษตอนนี้ (open positions)</h2>
     <div id="positions"></div>
@@ -261,16 +285,14 @@ HTML = """<!DOCTYPE html>
     <h2 style="margin-top:12px">ทำไมถึงจำลองสามตัวนี้</h2>
     <ul id="reasons"></ul>
     <p class="sub">รายงาน QuantStats (เทียบซื้อแล้วถือทั้งช่วง):
-      <a href="tearsheets/btc_sma_filter.html">BTC เส้น 200 วัน</a> ·
-      <a href="tearsheets/btc_macd.html">BTC MACD</a> ·
-      <a href="tearsheets/btc_donchian.html">BTC ดอนเชียน</a><br />
-      <a href="tearsheets/eth_sma_filter.html">ETH เส้น 200 วัน</a> ·
-      <a href="tearsheets/eth_macd.html">ETH MACD</a> ·
-      <a href="tearsheets/eth_donchian.html">ETH ดอนเชียน</a>
+      <a href="tearsheets/btc_sma_filter.html">BTC 1d SMA</a> ·
+      <a href="tearsheets/btc_sma_filter_4h.html">BTC 4h SMA</a> ·
+      <a href="tearsheets/eth_sma_filter.html">ETH 1d SMA</a> ·
+      <a href="tearsheets/eth_sma_filter_4h.html">ETH 4h SMA</a>
     </p>
   </section>
 </main>
-<footer>จำลองเท่านั้น เงิน 10,000 ดอลลาร์ต่อกลยุทธ์ต่อเหรียญ ค่าธรรมเนียม 0.10% และ slippage 0.05% ไม่มีการส่งคำสั่งจริง</footer>
+<footer>จำลองเท่านั้น ไม่มีกรอบ 1 ชั่วโมง เพราะสัญญาณหลอกและค่าธรรมเนียมจะกินกำไร เงิน 10,000 ดอลลาร์ต่อกลยุทธ์ต่อเหรียญ ค่าธรรมเนียม 0.10% และ slippage 0.05% กลยุทธ์รายวันเปลี่ยนสถานะเฉพาะหลังแท่งวันปิด</footer>
 <script id="lab-data" type="application/json">__DATA__</script>
 <script>
 const data = JSON.parse(document.getElementById("lab-data").textContent);
@@ -310,7 +332,7 @@ function drawPrice(asset) {
   const times = new Set((data.candles[asset] || []).map(c => c.time));
   const markers = (data.markers || []).filter(m => m.asset === asset && times.has(m.time))
     .map(({time, position, color, shape, text}) => ({time, position, color, shape, text}))
-    .sort((a, b) => a.time.localeCompare(b.time) || a.text.localeCompare(b.text));
+    .sort((a, b) => a.time - b.time || String(a.text).localeCompare(String(b.text)));
   candle.setMarkers(markers);
   priceChart.timeScale().fitContent();
   drawEquity(asset);
@@ -327,9 +349,9 @@ function drawEquity(asset) {
   Object.keys(book).forEach(name => {
     const series = chart.addLineSeries({
       color: (data.colors && data.colors[name]) || "#ffffff",
-      lineWidth: name === "buy_and_hold" ? 1 : 2,
-      lineStyle: name === "buy_and_hold" ? 2 : 0,
-      title: name
+      lineWidth: name.indexOf("buy_and_hold") === 0 ? 1 : 2,
+      lineStyle: name.indexOf("|1d") > 0 || name.indexOf("buy_and_hold") === 0 ? 2 : 0,
+      title: (data.names && data.names[name]) || name
     });
     series.setData(book[name]);
   });
@@ -347,18 +369,19 @@ document.querySelectorAll("button.asset").forEach(btn => {
 drawPrice("BTC");
 
 const board = document.getElementById("board");
-let html = "<table><tr><th>เหรียญ</th><th>กลยุทธ์</th><th>CAGR</th><th>Max DD</th><th>Sharpe</th><th>Win</th><th>เทรด</th></tr>";
+let html = "<table><tr><th>เหรียญ</th><th>กรอบ</th><th>กลยุทธ์</th><th>CAGR</th><th>Max DD</th><th>Sharpe</th><th>Win</th><th>เทรด</th></tr>";
 (data.leaderboard || []).forEach(row => {
   const klass = row.cagr >= 0 ? "pos" : "neg";
-  html += `<tr><td>${row.asset}</td><td>${row.name_th}</td><td class="${klass}">${pct(row.cagr)}</td><td class="neg">${pct(row.max_drawdown)}</td><td>${num(row.sharpe)}</td><td>${pct(row.win_rate)}</td><td>${row.n_trades}</td></tr>`;
+  html += `<tr><td>${row.asset}</td><td>${row.timeframe_th || row.timeframe}</td><td>${row.name_th}</td><td class="${klass}">${pct(row.cagr)}</td><td class="neg">${pct(row.max_drawdown)}</td><td>${num(row.sharpe)}</td><td>${pct(row.win_rate)}</td><td>${row.n_trades}</td></tr>`;
 });
 board.innerHTML = html + "</table>";
 
 const pos = document.getElementById("positions");
-let phtml = "<table><tr><th>เหรียญ</th><th>กลยุทธ์</th><th>สถานะ</th><th>เงินสด</th><th>มูลค่าเหรียญ</th></tr>";
+let phtml = "<table><tr><th>เหรียญ</th><th>กรอบ</th><th>กลยุทธ์</th><th>สถานะ</th><th>เงินสด</th><th>มูลค่าเหรียญ</th></tr>";
 (data.positions || []).forEach(row => {
   const klass = row.side === "long" ? "pos" : "cash";
-  phtml += `<tr><td>${row.asset}</td><td>${row.name_th}</td><td class="${klass}">${row.side_th}</td><td>${num(row.cash)}</td><td>${num(row.market_value)}</td></tr>`;
+  const clock = row.timeframe === "4h" ? "4h" : "1d";
+  phtml += `<tr><td>${row.asset}</td><td>${clock}</td><td>${row.name_th}</td><td class="${klass}">${row.side_th}</td><td>${num(row.cash)}</td><td>${num(row.market_value)}</td></tr>`;
 });
 pos.innerHTML = phtml + "</table>";
 
@@ -366,7 +389,8 @@ const trades = document.getElementById("trades");
 let thtml = "<table><tr><th>เข้า</th><th>ออก</th><th>คู่</th><th>ผล</th></tr>";
 (data.trades || []).forEach(row => {
   const ret = row.closed ? pct(row.return_pct) : "ถืออยู่";
-  thtml += `<tr><td>${row.entry_date}</td><td>${row.exit_date || "—"}</td><td>${row.asset} ${row.name_th}</td><td>${ret}</td></tr>`;
+  const clock = row.timeframe === "4h" ? "4h" : "1d";
+  thtml += `<tr><td>${row.entry_date}</td><td>${row.exit_date || "—"}</td><td>${row.asset} ${clock} ${row.name_th}</td><td>${ret}</td></tr>`;
 });
 trades.innerHTML = thtml + "</table>";
 

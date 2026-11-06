@@ -15,6 +15,7 @@ DB_PATH = ROOT / "data" / "lab.sqlite"
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS backtest_results (
     asset TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
     strategy TEXT NOT NULL,
     experiment TEXT NOT NULL,
     params TEXT NOT NULL,
@@ -30,11 +31,12 @@ CREATE TABLE IF NOT EXISTS backtest_results (
     bh_max_drawdown REAL,
     beat_bh_return INTEGER,
     beat_bh_sharpe INTEGER,
-    PRIMARY KEY (asset, strategy, experiment, params)
+    PRIMARY KEY (asset, timeframe, strategy, experiment, params)
 );
 
 CREATE TABLE IF NOT EXISTS sweep_results (
     asset TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
     strategy TEXT NOT NULL,
     experiment TEXT NOT NULL,
     params TEXT NOT NULL,
@@ -50,26 +52,30 @@ CREATE TABLE IF NOT EXISTS sweep_results (
     bh_sharpe REAL,
     vectorbt_end_value REAL,
     engine_end_value REAL,
-    PRIMARY KEY (asset, strategy, experiment, params)
+    PRIMARY KEY (asset, timeframe, strategy, experiment, params)
 );
 
 CREATE TABLE IF NOT EXISTS paper_strategies (
-    strategy TEXT PRIMARY KEY,
+    strategy TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
     params TEXT NOT NULL,
     why_th TEXT NOT NULL,
-    selected INTEGER NOT NULL
+    selected INTEGER NOT NULL,
+    PRIMARY KEY (strategy, timeframe)
 );
 
 CREATE TABLE IF NOT EXISTS paper_equity (
     asset TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
     strategy TEXT NOT NULL,
     date TEXT NOT NULL,
     equity REAL NOT NULL,
-    PRIMARY KEY (asset, strategy, date)
+    PRIMARY KEY (asset, timeframe, strategy, date)
 );
 
 CREATE TABLE IF NOT EXISTS paper_trades (
     asset TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
     strategy TEXT NOT NULL,
     entry_date TEXT NOT NULL,
     exit_date TEXT,
@@ -77,11 +83,12 @@ CREATE TABLE IF NOT EXISTS paper_trades (
     exit_price REAL,
     return_pct REAL,
     closed INTEGER NOT NULL,
-    PRIMARY KEY (asset, strategy, entry_date)
+    PRIMARY KEY (asset, timeframe, strategy, entry_date)
 );
 
 CREATE TABLE IF NOT EXISTS paper_positions (
     asset TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
     strategy TEXT NOT NULL,
     units REAL NOT NULL,
     cash REAL NOT NULL,
@@ -89,7 +96,7 @@ CREATE TABLE IF NOT EXISTS paper_positions (
     market_value REAL,
     side TEXT NOT NULL,
     as_of TEXT NOT NULL,
-    PRIMARY KEY (asset, strategy)
+    PRIMARY KEY (asset, timeframe, strategy)
 );
 
 CREATE TABLE IF NOT EXISTS meta (
@@ -103,6 +110,17 @@ def connect(path: Path = DB_PATH) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
+    existing = [row[1] for row in conn.execute("PRAGMA table_info(paper_equity)").fetchall()]
+    if existing and "timeframe" not in existing:
+        for name in (
+            "backtest_results",
+            "sweep_results",
+            "paper_strategies",
+            "paper_equity",
+            "paper_trades",
+            "paper_positions",
+        ):
+            conn.execute(f"DROP TABLE IF EXISTS {name}")
     conn.executescript(SCHEMA)
     return conn
 

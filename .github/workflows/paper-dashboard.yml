@@ -2,8 +2,8 @@ name: paper dashboard
 
 on:
   schedule:
-    # Every 4 hours. Daily strategies only change after a candle closes;
-    # a repeat run with no new candle still rewrites the same rows.
+    # 15 minutes after each 4-hour candle can close: 00:15, 04:15, 08:15, 12:15, 16:15, 20:15 UTC.
+    # 4-hour strategies may trade each run. Daily strategies change only after the daily close.
     - cron: "15 */4 * * *"
   workflow_dispatch:
 

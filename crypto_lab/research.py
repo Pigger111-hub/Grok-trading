@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from crypto_lab.assumptions import FEE_RATE, IN_SAMPLE_FRACTION, SLIPPAGE_RATE
+from crypto_lab.assumptions import BARS_PER_DAY, FEE_RATE, IN_SAMPLE_FRACTION, SLIPPAGE_RATE, WALK_FORWARD_TEST_DAYS, WALK_FORWARD_TRAIN_DAYS
 from crypto_lab.data import CACHE_DIR, load_cached
 from crypto_lab.engine import run_backtest
 from crypto_lab.plots import plot_comparison, plot_overview
@@ -48,7 +48,7 @@ def split_point(n_rows: int, fraction: float = IN_SAMPLE_FRACTION) -> int:
     return min(max(cut, 1), n_rows - 1)
 
 
-def backtest_window(bars, strategy, params, start: int, end: int, fee_rate: float = FEE_RATE):
+def backtest_window(bars, strategy, params, start: int, end: int, fee_rate: float = FEE_RATE, step_bars: int | None = None):
     """Test bars[start:end]. Signal strategies may read prices before `start`."""
     from crypto_lab.engine import run_dca
 
@@ -57,6 +57,7 @@ def backtest_window(bars, strategy, params, start: int, end: int, fee_rate: floa
         strategy_result = run_dca(
             window,
             weeks=int(params["weeks"]),
+            step_days=step_bars,
             fee_rate=fee_rate,
             slippage_rate=SLIPPAGE_RATE,
         )
@@ -85,11 +86,12 @@ def _beats(left, right) -> bool:
     return float(left) > float(right)
 
 
-def _row(asset, strategy, experiment, params, strategy_result, benchmark) -> dict:
+def _row(asset, strategy, experiment, params, strategy_result, benchmark, timeframe: str = "1d") -> dict:
     sm = strategy_result.metrics
     bm = benchmark.metrics
     return {
         "asset": asset,
+        "timeframe": timeframe,
         "strategy": strategy.id,
         "strategy_th": strategy.name_th,
         "experiment": experiment,
@@ -136,13 +138,14 @@ def _markdown_table(frame: pd.DataFrame) -> str:
         )
     ]
     lines = [
-        "| เหรียญ | กลยุทธ์ | การทดลอง | ผลตอบแทนรวม | ทบต้นต่อปี | ขาดทุนสูงสุด | Sharpe | อัตราชนะ | จำนวนเทรด | สัดส่วนวันที่ถือ | ซื้อแล้วถือ | Sharpe ซื้อแล้วถือ | กำไรสูงกว่าซื้อแล้วถือ? | Sharpe สูงกว่าซื้อแล้วถือ? |",
-        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
+        "| เหรียญ | กรอบ | กลยุทธ์ | การทดลอง | ผลตอบแทนรวม | ทบต้นต่อปี | ขาดทุนสูงสุด | Sharpe | อัตราชนะ | จำนวนเทรด | สัดส่วนวันที่ถือ | ซื้อแล้วถือ | Sharpe ซื้อแล้วถือ | กำไรสูงกว่าซื้อแล้วถือ? | Sharpe สูงกว่าซื้อแล้วถือ? |",
+        "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
     ]
     for row in show.itertuples(index=False):
         lines.append(
-            "| {asset} | {name} | {exp} | {ret} | {cagr} | {dd} | {sh} | {win} | {trades} | {expo} | {bh} | {bhs} | {br} | {bs} |".format(
+            "| {asset} | {clock} | {name} | {exp} | {ret} | {cagr} | {dd} | {sh} | {win} | {trades} | {expo} | {bh} | {bhs} | {br} | {bs} |".format(
                 asset=row.asset,
+                clock=getattr(row, "timeframe", "1d"),
                 name=row.strategy_th,
                 exp=row.experiment_th,
                 ret=_pct(row.total_return),
@@ -188,7 +191,11 @@ def upsert_journal_results(table: str, cost_table: str, journal_path: Path = JOU
     journal_path.write_text(text, encoding="utf-8")
 
 
-def run_research(assets: dict[str, pd.DataFrame] | None = None) -> pd.DataFrame:
+def run_research(
+    assets: dict[str, pd.DataFrame] | None = None,
+    timeframe: str = "1d",
+    write_summary: bool = True,
+) -> pd.DataFrame:
     if assets is None:
         assets = load_cached(CACHE_DIR)
     RESULTS.mkdir(parents=True, exist_ok=True)
@@ -196,8 +203,12 @@ def run_research(assets: dict[str, pd.DataFrame] | None = None) -> pd.DataFrame:
     rows = []
     fold_rows = []
 
+    bar_scale = BARS_PER_DAY[timeframe]
+    step_bars = 7 * bar_scale
     for asset, bars in assets.items():
-        print(f"\n=== {asset}: {bars.index.min().date()} ถึง {bars.index.max().date()} ({len(bars)} วัน) ===")
+        print(
+            f"\n=== {asset} {timeframe}: {bars.index.min()} ถึง {bars.index.max()} ({len(bars)} แท่ง) ==="
+        )
         cut = split_point(len(bars))
         overview = {}
         overview_bh = None
@@ -214,20 +225,29 @@ def run_research(assets: dict[str, pd.DataFrame] | None = None) -> pd.DataFrame:
             }
             stored = {}
             for experiment, (start, end, params, fee) in runs.items():
-                strategy_result, benchmark = backtest_window(bars, strategy, params, start, end, fee_rate=fee)
+                strategy_result, benchmark = backtest_window(
+                    bars, strategy, params, start, end, fee_rate=fee, step_bars=step_bars
+                )
                 stored[experiment] = (strategy_result, benchmark, params)
-                rows.append(_row(asset, strategy, experiment, params, strategy_result, benchmark))
+                rows.append(_row(asset, strategy, experiment, params, strategy_result, benchmark, timeframe))
 
             tuned, _score = choose_params(bars.iloc[:cut], strategy, train_days=cut)
             for experiment, start, end in (
                 ("is_tuned", 0, cut),
                 ("oos_tuned", cut, len(bars)),
             ):
-                strategy_result, benchmark = backtest_window(bars, strategy, tuned, start, end)
+                strategy_result, benchmark = backtest_window(
+                    bars, strategy, tuned, start, end, step_bars=step_bars
+                )
                 stored[experiment] = (strategy_result, benchmark, tuned)
-                rows.append(_row(asset, strategy, experiment, tuned, strategy_result, benchmark))
+                rows.append(_row(asset, strategy, experiment, tuned, strategy_result, benchmark, timeframe))
 
-            wf = walk_forward(bars, strategy)
+            wf = walk_forward(
+                bars,
+                strategy,
+                train_days=WALK_FORWARD_TRAIN_DAYS * bar_scale,
+                test_days=WALK_FORWARD_TEST_DAYS * bar_scale,
+            )
             rows.append(
                 _row(
                     asset,
@@ -236,12 +256,14 @@ def run_research(assets: dict[str, pd.DataFrame] | None = None) -> pd.DataFrame:
                     {"note": "พารามิเตอร์เปลี่ยนทุกช่วง ดู results/folds.csv"},
                     wf.result,
                     wf.benchmark,
+                    timeframe,
                 )
             )
             for fold_number, fold in enumerate(wf.folds, start=1):
                 fold_rows.append(
                     {
                         "asset": asset,
+                        "timeframe": timeframe,
                         "strategy": strategy.id,
                         "fold": fold_number,
                         "test_start": pd.Timestamp(fold["test_start"]).date().isoformat(),
@@ -251,46 +273,56 @@ def run_research(assets: dict[str, pd.DataFrame] | None = None) -> pd.DataFrame:
                     }
                 )
 
+            tag = "" if timeframe == "1d" else f"_{timeframe}"
             plot_comparison(
                 stored["full_default"][0].equity,
                 stored["full_default"][1].equity,
-                CHARTS / f"{asset.lower()}_{strategy.id}_full.png",
-                f"{asset} {strategy.name_en} vs buy-and-hold (full sample, textbook settings)",
+                CHARTS / f"{asset.lower()}_{strategy.id}{tag}_full.png",
+                f"{asset} {timeframe} {strategy.name_en} vs buy-and-hold (full sample, textbook settings)",
             )
             plot_comparison(
                 stored["oos_default"][0].equity,
                 stored["oos_default"][1].equity,
-                CHARTS / f"{asset.lower()}_{strategy.id}_oos.png",
-                f"{asset} {strategy.name_en} vs buy-and-hold (last 30%, textbook settings)",
+                CHARTS / f"{asset.lower()}_{strategy.id}{tag}_oos.png",
+                f"{asset} {timeframe} {strategy.name_en} vs buy-and-hold (last 30%, textbook settings)",
             )
             plot_comparison(
                 wf.result.equity,
                 wf.benchmark.equity,
-                CHARTS / f"{asset.lower()}_{strategy.id}_walkforward.png",
-                f"{asset} {strategy.name_en} walk-forward vs buy-and-hold",
+                CHARTS / f"{asset.lower()}_{strategy.id}{tag}_walkforward.png",
+                f"{asset} {timeframe} {strategy.name_en} walk-forward vs buy-and-hold",
             )
             overview[strategy.name_en] = stored["full_default"][0].equity
             overview_bh = stored["full_default"][1].equity
             wf_overview[strategy.name_en] = wf.result.equity
             wf_bh = wf.benchmark.equity
 
+        tag = "" if timeframe == "1d" else f"_{timeframe}"
         plot_overview(
             overview,
             overview_bh,
-            CHARTS / f"{asset.lower()}_overview_full.png",
-            f"{asset} textbook strategies vs buy-and-hold (full sample, log scale)",
+            CHARTS / f"{asset.lower()}{tag}_overview_full.png",
+            f"{asset} {timeframe} textbook strategies vs buy-and-hold (full sample, log scale)",
         )
         plot_overview(
             wf_overview,
             wf_bh,
-            CHARTS / f"{asset.lower()}_overview_walkforward.png",
-            f"{asset} walk-forward strategies vs buy-and-hold (log scale)",
+            CHARTS / f"{asset.lower()}{tag}_overview_walkforward.png",
+            f"{asset} {timeframe} walk-forward strategies vs buy-and-hold (log scale)",
         )
 
     frame = pd.DataFrame(rows)
-    frame.to_csv(RESULTS / "summary.csv", index=False)
     folds = pd.DataFrame(fold_rows)
-    folds.to_csv(RESULTS / "folds.csv", index=False)
+    folds.to_csv(RESULTS / f"folds_{timeframe}.csv", index=False)
+    if write_summary:
+        persist_summary(frame, folds)
+    return frame
+
+
+def persist_summary(frame: pd.DataFrame, folds: pd.DataFrame | None = None) -> None:
+    frame.to_csv(RESULTS / "summary.csv", index=False)
+    if folds is not None:
+        folds.to_csv(RESULTS / "folds.csv", index=False)
     table = _markdown_table(frame)
     costs = _cost_table(frame)
     (RESULTS / "summary.md").write_text(
@@ -315,4 +347,3 @@ def run_research(assets: dict[str, pd.DataFrame] | None = None) -> pd.DataFrame:
         for row in winners.itertuples(index=False):
             print(f"  {row.asset} {row.strategy}: {_pct(row.total_return)} เทียบกับ {_pct(row.bh_total_return)}")
     print(f"บันทึกตารางที่ {RESULTS / 'summary.md'}")
-    return frame

@@ -29,14 +29,15 @@ def save_backtests(conn: sqlite3.Connection, frame: pd.DataFrame) -> None:
     conn.executemany(
         """
         INSERT INTO backtest_results (
-            asset, strategy, experiment, params, total_return, cagr, max_drawdown,
+            asset, timeframe, strategy, experiment, params, total_return, cagr, max_drawdown,
             sharpe, win_rate, n_trades, exposure, bh_total_return, bh_sharpe,
             bh_max_drawdown, beat_bh_return, beat_bh_sharpe
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
                 row.asset,
+                getattr(row, "timeframe", "1d"),
                 row.strategy,
                 row.experiment,
                 row.params,
@@ -65,14 +66,19 @@ def export_csv(conn: sqlite3.Connection) -> None:
         table.to_csv(folder / f"{name}.csv", index=False)
 
 
-def run_sweep_and_sheets(conn: sqlite3.Connection, assets: dict[str, pd.DataFrame]) -> pd.DataFrame:
+def run_sweep_and_sheets(
+    conn: sqlite3.Connection,
+    assets: dict[str, pd.DataFrame],
+    timeframe: str = "1d",
+) -> pd.DataFrame:
     frames = []
     for asset, bars in assets.items():
-        print(f"กวาดพารามิเตอร์ {asset} ...")
+        print(f"กวาดพารามิเตอร์ {asset} {timeframe} ...")
         rows = sweep_asset(bars)
         for row in rows:
             row["asset"] = asset
-        save_sweep(conn, asset, rows)
+            row["timeframe"] = timeframe
+        save_sweep(conn, asset, rows, timeframe=timeframe)
         frames.append(pd.DataFrame(rows))
     sweep = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     (ROOT / "results" / "sweep.md").write_text(render_sweep_markdown(sweep), encoding="utf-8")
@@ -81,17 +87,27 @@ def run_sweep_and_sheets(conn: sqlite3.Connection, assets: dict[str, pd.DataFram
         for spec in PAPER_BOOK:
             print(f"รายงาน QuantStats {asset} {spec['id']} ...")
             try:
-                write_strategy_tearsheet(bars, asset, spec["id"], spec["params"], folder)
+                write_strategy_tearsheet(bars, asset, spec["id"], spec["params"], folder, timeframe=timeframe)
             except Exception as exc:
                 print(f"ข้าม tear sheet {asset} {spec['id']}: {exc}")
     return sweep
 
 
-def publish(conn: sqlite3.Connection, assets: dict[str, pd.DataFrame]) -> None:
-    latest = min(frame.index.max() for frame in assets.values())
-    set_meta(conn, "price_as_of", pd.Timestamp(latest).date().isoformat())
+def publish(
+    conn: sqlite3.Connection,
+    assets: dict[str, pd.DataFrame],
+    intraday: dict[str, pd.DataFrame] | None = None,
+) -> None:
+    chart_prices = intraday or assets
+    latest = min(frame.index.max() for frame in chart_prices.values())
+    stamp = pd.Timestamp(latest)
+    as_of = stamp.strftime("%Y-%m-%d %H:%M UTC") if stamp != stamp.normalize() else stamp.date().isoformat()
+    set_meta(conn, "price_as_of", as_of)
     export_csv(conn)
     for asset, frame in assets.items():
         save_ohlcv(frame, CACHE_DIR / f"{asset.lower()}_usd_daily.csv")
-    write_dashboard(conn, assets)
+    if intraday:
+        for asset, frame in intraday.items():
+            save_ohlcv(frame, CACHE_DIR / f"{asset.lower()}_usd_4h.csv")
+    write_dashboard(conn, chart_prices)
     conn.commit()

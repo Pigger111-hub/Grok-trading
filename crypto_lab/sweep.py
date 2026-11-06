@@ -124,19 +124,20 @@ def _row(strategy, experiment, params, result, benchmark, vectorbt_end) -> dict:
     }
 
 
-def save_sweep(conn, asset: str, rows: list[dict]) -> None:
-    conn.execute("DELETE FROM sweep_results WHERE asset = ?", (asset,))
+def save_sweep(conn, asset: str, rows: list[dict], timeframe: str = "1d") -> None:
+    conn.execute("DELETE FROM sweep_results WHERE asset = ? AND timeframe = ?", (asset, timeframe))
     conn.executemany(
         """
         INSERT INTO sweep_results (
-            asset, strategy, experiment, params, is_default, total_return, cagr,
+            asset, timeframe, strategy, experiment, params, is_default, total_return, cagr,
             max_drawdown, sharpe, win_rate, n_trades, exposure, bh_total_return,
             bh_sharpe, vectorbt_end_value, engine_end_value
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
                 asset,
+                timeframe,
                 row["strategy"],
                 row["experiment"],
                 row["params"],
@@ -171,14 +172,17 @@ def render_sweep_markdown(frame: pd.DataFrame) -> str:
     if frame.empty:
         lines.append("ยังไม่มีผลกวาด")
         return "\n".join(lines)
-    for (asset, strategy), group in frame.groupby(["asset", "strategy"]):
+    if "timeframe" not in frame.columns:
+        frame = frame.copy()
+        frame["timeframe"] = "1d"
+    for (asset, timeframe, strategy), group in frame.groupby(["asset", "timeframe", "strategy"]):
         ins = group[group["experiment"] == "sweep_is"].sort_values("sharpe", ascending=False)
         if ins.empty or ins["sharpe"].isna().all():
             continue
         best = ins.iloc[0]
         oos = group[(group["experiment"] == "sweep_oos") & (group["params"] == best["params"])]
         default_oos = group[(group["experiment"] == "sweep_oos") & (group["is_default"] == 1)]
-        lines.append(f"## {asset} {strategy}")
+        lines.append(f"## {asset} {timeframe} {strategy}")
         lines.append("")
         lines.append(f"- ค่าที่ Sharpe ในตัวอย่างสูงสุด: `{best['params']}` Sharpe {best['sharpe']:.2f}")
         if len(oos):
