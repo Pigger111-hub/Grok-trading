@@ -1,5 +1,9 @@
-pandas>=2.2,<3
+pandas>=2.2,<4
 numpy>=1.26,<3
 matplotlib>=3.8,<4
 requests>=2.31,<3
 pytest>=8,<9
+ccxt>=4.4,<5
+quantstats>=0.0.62
+pandas-ta>=0.3.14b
+vectorbt>=0.26

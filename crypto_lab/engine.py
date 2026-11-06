@@ -26,6 +26,8 @@ class BacktestResult:
     trades: list
     metrics: dict
     held: np.ndarray
+    final_cash: float = 0.0
+    final_units: float = 0.0
 
 
 def run_backtest(
@@ -102,6 +104,8 @@ def run_backtest(
         trades=trades,
         metrics=compute_metrics(equity_s, trades, held),
         held=held,
+        final_cash=cash,
+        final_units=units,
     )
 
 
@@ -171,4 +175,6 @@ def run_dca(
         trades=trades,
         metrics=compute_metrics(equity_s, trades, held),
         held=held,
+        final_cash=cash,
+        final_units=units,
     )

@@ -24,3 +24,7 @@ IN_SAMPLE_FRACTION = 0.70
 # Walk-forward: pick parameters using the previous 2 years, then trade the next year.
 WALK_FORWARD_TRAIN_DAYS = 730
 WALK_FORWARD_TEST_DAYS = 365
+
+# Paper book opens on this UTC date with INITIAL_CASH. It is still a simulation:
+# the cron only appends newer closed daily candles after this date.
+PAPER_START = "2025-01-01"
