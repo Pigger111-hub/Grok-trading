@@ -18,6 +18,7 @@ import pandas as pd
 
 from crypto_lab.assumptions import FEE_RATE, INITIAL_CASH, SLIPPAGE_RATE
 from crypto_lab.metrics import compute_metrics
+from crypto_lab.timeframes import weekly_step_bars
 
 
 @dataclass
@@ -26,6 +27,8 @@ class BacktestResult:
     trades: list
     metrics: dict
     held: np.ndarray
+    final_cash: float = 0.0
+    final_units: float = 0.0
 
 
 def run_backtest(
@@ -102,13 +105,15 @@ def run_backtest(
         trades=trades,
         metrics=compute_metrics(equity_s, trades, held),
         held=held,
+        final_cash=cash,
+        final_units=units,
     )
 
 
 def run_dca(
     bars: pd.DataFrame,
     weeks: int = 52,
-    step_days: int = 7,
+    step_days: int | None = None,
     initial_cash: float = INITIAL_CASH,
     fee_rate: float = FEE_RATE,
     slippage_rate: float = SLIPPAGE_RATE,
@@ -123,6 +128,8 @@ def run_dca(
     """
     if weeks < 1:
         raise ValueError("weeks must be at least 1")
+    if step_days is None:
+        step_days = weekly_step_bars(bars.index)
     n = len(bars)
     opens = bars["open"].to_numpy(dtype=float)
     closes = bars["close"].to_numpy(dtype=float)
@@ -171,4 +178,6 @@ def run_dca(
         trades=trades,
         metrics=compute_metrics(equity_s, trades, held),
         held=held,
+        final_cash=cash,
+        final_units=units,
     )

@@ -54,14 +54,17 @@ def http_get_json(url: str, params: dict | None = None, retries: int = 4):
     raise RuntimeError(f"ดาวน์โหลดไม่สำเร็จ: {url}") from last_error
 
 
-def parse_bitstamp(raw: list, source: str = "bitstamp") -> pd.DataFrame:
+def _as_timestamp(raw_value, unit: str, align_midnight: bool) -> pd.Timestamp:
+    stamp = pd.to_datetime(int(raw_value), unit=unit, utc=True).tz_convert(None)
+    return stamp.normalize() if align_midnight else stamp
+
+
+def parse_bitstamp(raw: list, source: str = "bitstamp", align_midnight: bool = True) -> pd.DataFrame:
     rows = []
     for candle in raw:
         rows.append(
             {
-                "date": pd.to_datetime(int(candle["timestamp"]), unit="s", utc=True)
-                .tz_convert(None)
-                .normalize(),
+                "date": _as_timestamp(candle["timestamp"], "s", align_midnight),
                 "open": float(candle["open"]),
                 "high": float(candle["high"]),
                 "low": float(candle["low"]),
@@ -76,14 +79,14 @@ def parse_bitstamp(raw: list, source: str = "bitstamp") -> pd.DataFrame:
     return frame.set_index("date")
 
 
-def parse_bitfinex(raw: list, source: str = "bitfinex") -> pd.DataFrame:
+def parse_bitfinex(raw: list, source: str = "bitfinex", align_midnight: bool = True) -> pd.DataFrame:
     # Documented order is [MTS, OPEN, CLOSE, HIGH, LOW, VOLUME], not OHLCV.
     rows = []
     for candle in raw:
         mts, open_, close, high, low, volume = candle[:6]
         rows.append(
             {
-                "date": pd.to_datetime(int(mts), unit="ms", utc=True).tz_convert(None).normalize(),
+                "date": _as_timestamp(mts, "ms", align_midnight),
                 "open": float(open_),
                 "high": float(high),
                 "low": float(low),
@@ -168,6 +171,10 @@ def calendar_gaps(dates) -> list[tuple]:
 
 
 def fetch_bitstamp_daily(pair: str, start_ts: int) -> pd.DataFrame:
+    return fetch_bitstamp(pair, start_ts, step_seconds=86400, align_midnight=True)
+
+
+def fetch_bitstamp(pair: str, start_ts: int, step_seconds: int, align_midnight: bool) -> pd.DataFrame:
     rows = []
     seen = set()
     cursor = start_ts
@@ -175,7 +182,7 @@ def fetch_bitstamp_daily(pair: str, start_ts: int) -> pd.DataFrame:
     while cursor < end_ts:
         payload = http_get_json(
             f"https://www.bitstamp.net/api/v2/ohlc/{pair}/",
-            {"step": 86400, "limit": 1000, "start": cursor},
+            {"step": step_seconds, "limit": 1000, "start": cursor},
         )
         batch = payload.get("data", {}).get("ohlc", [])
         fresh = []
@@ -187,22 +194,26 @@ def fetch_bitstamp_daily(pair: str, start_ts: int) -> pd.DataFrame:
         if not fresh:
             break
         rows.extend(fresh)
-        next_cursor = max(int(candle["timestamp"]) for candle in batch) + 86400
+        next_cursor = max(int(candle["timestamp"]) for candle in batch) + step_seconds
         if next_cursor <= cursor:
             break
         cursor = next_cursor
         time.sleep(0.2)
-    return parse_bitstamp(rows, source=f"bitstamp:{pair}")
+    return parse_bitstamp(rows, source=f"bitstamp:{pair}", align_midnight=align_midnight)
 
 
 def fetch_bitfinex_daily(symbol: str, start_ms: int) -> pd.DataFrame:
+    return fetch_bitfinex(symbol, start_ms, interval="1D", step_ms=86_400_000, align_midnight=True)
+
+
+def fetch_bitfinex(symbol: str, start_ms: int, interval: str, step_ms: int, align_midnight: bool) -> pd.DataFrame:
     rows = []
     seen = set()
     cursor = start_ms
     end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     while cursor < end_ms:
         payload = http_get_json(
-            f"https://api-pub.bitfinex.com/v2/candles/trade:1D:{symbol}/hist",
+            f"https://api-pub.bitfinex.com/v2/candles/trade:{interval}:{symbol}/hist",
             {"limit": 10000, "sort": 1, "start": cursor},
         )
         if not isinstance(payload, list) or not payload:
@@ -216,14 +227,14 @@ def fetch_bitfinex_daily(symbol: str, start_ms: int) -> pd.DataFrame:
         if not fresh:
             break
         rows.extend(fresh)
-        next_cursor = max(int(candle[0]) for candle in payload) + 86_400_000
+        next_cursor = max(int(candle[0]) for candle in payload) + step_ms
         if next_cursor <= cursor:
             break
         cursor = next_cursor
         if len(payload) < 10000:
             break
         time.sleep(0.3)
-    return parse_bitfinex(rows, source=f"bitfinex:{symbol}")
+    return parse_bitfinex(rows, source=f"bitfinex:{symbol}", align_midnight=align_midnight)
 
 
 def fetch_yahoo_daily(symbol: str) -> pd.DataFrame:
@@ -505,7 +516,66 @@ def update_all(cache_dir: Path = CACHE_DIR) -> dict[str, pd.DataFrame]:
         f"ETH {eth['date'].min().date()} → {eth['date'].max().date()} ({len(eth)} วัน)"
     )
     print(f"บันทึกคุณภาพข้อมูลไว้ที่ {QUALITY_PATH}")
+    print("กำลังดาวน์โหลดแท่ง 4 ชั่วโมง (ไม่ดาวน์โหลดแท่ง 1 ชั่วโมง) ...")
+    btc_4h = prepare_intraday(
+        fetch_bitstamp("btcusd", BITSTAMP_START["btcusd"], step_seconds=14_400, align_midnight=False),
+        bar_hours=4,
+    )
+    eth_4h = prepare_intraday(
+        fetch_bitfinex(
+            "tETHUSD",
+            BITFINEX_ETH_START_MS,
+            interval="4h",
+            step_ms=14_400_000,
+            align_midnight=False,
+        ),
+        bar_hours=4,
+    )
+    _require_history(btc_4h, "2012-01-01", 20_000, "BTC 4h")
+    _require_history(eth_4h, "2016-06-01", 12_000, "ETH 4h")
+    btc_4h.to_csv(cache_dir / "btc_usd_4h.csv", index=False)
+    eth_4h.to_csv(cache_dir / "eth_usd_4h.csv", index=False)
+    note = (
+        "\n## แท่ง 4 ชั่วโมง\n\n"
+        f"- BTC: {btc_4h['date'].min()} ถึง {btc_4h['date'].max()} จำนวน {len(btc_4h)} แท่ง จาก Bitstamp\n"
+        f"- ETH: {eth_4h['date'].min()} ถึง {eth_4h['date'].max()} จำนวน {len(eth_4h)} แท่ง จาก Bitfinex\n"
+        "- ไม่ได้ดาวน์โหลดแท่ง 1 ชั่วโมง เพราะสัญญาณหลอกถี่และค่าธรรมเนียมจะกินผลกำไร\n"
+    )
+    QUALITY_PATH.write_text(QUALITY_PATH.read_text(encoding="utf-8") + note, encoding="utf-8")
+    print(
+        f"BTC 4h {len(btc_4h)} แท่ง  ETH 4h {len(eth_4h)} แท่ง"
+    )
     return {"BTC": load_ohlcv(cache_dir / "btc_usd_daily.csv"), "ETH": load_ohlcv(cache_dir / "eth_usd_daily.csv")}
+
+
+def prepare_intraday(raw: pd.DataFrame, bar_hours: int) -> pd.DataFrame:
+    """Keep only closed intraday bars. Do not snap timestamps to midnight."""
+    frame = raw.reset_index() if "date" not in raw.columns else raw.copy()
+    frame["date"] = pd.to_datetime(frame["date"], utc=True).dt.tz_convert(None)
+    frame = frame.drop_duplicates(subset=["date"], keep="last")
+    now = pd.Timestamp(datetime.now(timezone.utc)).tz_localize(None)
+    closed = frame["date"] + pd.Timedelta(hours=bar_hours) <= now
+    frame = frame.loc[closed].copy()
+    for column in ("open", "high", "low", "close"):
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    good = (
+        frame[["open", "high", "low", "close"]].notna().all(axis=1)
+        & (frame["high"] >= frame["low"])
+        & (frame["high"] >= frame["open"])
+        & (frame["high"] >= frame["close"])
+        & (frame["low"] <= frame["open"])
+        & (frame["low"] <= frame["close"])
+        & (frame["close"] > 0)
+        & (frame["open"] > 0)
+    )
+    return frame.loc[good].sort_values("date").reset_index(drop=True)
+
+
+def load_4h(cache_dir: Path = CACHE_DIR) -> dict[str, pd.DataFrame]:
+    return {
+        "BTC": load_ohlcv(cache_dir / "btc_usd_4h.csv"),
+        "ETH": load_ohlcv(cache_dir / "eth_usd_4h.csv"),
+    }
 
 
 def load_ohlcv(path: Path) -> pd.DataFrame:

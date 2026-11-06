@@ -24,3 +24,11 @@ IN_SAMPLE_FRACTION = 0.70
 # Walk-forward: pick parameters using the previous 2 years, then trade the next year.
 WALK_FORWARD_TRAIN_DAYS = 730
 WALK_FORWARD_TEST_DAYS = 365
+
+# Paper book opens on this UTC date with INITIAL_CASH. It is still a simulation.
+# The scheduled job runs on the 4-hour clock. Daily strategies may change
+# position only after a daily candle has closed.
+PAPER_START = "2025-01-01"
+
+# Bars per calendar day. One-hour candles are intentionally absent.
+BARS_PER_DAY = {"1d": 1, "4h": 6}
