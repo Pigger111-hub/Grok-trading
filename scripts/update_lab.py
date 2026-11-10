@@ -19,8 +19,11 @@ from crypto_lab.publish import publish  # noqa: E402
 
 
 def main() -> None:
+    # Walk forward from the last cached bar. A short limit used to drop
+    # candles when a scheduled run was skipped, and a stale coin still
+    # exited 0. refresh_cached_prices raises if either coin is behind.
     daily = refresh_cached_prices(load_cached(), timeframe="1d")
-    intraday = refresh_cached_prices(load_4h(), timeframe="4h", limit=12)
+    intraday = refresh_cached_prices(load_4h(), timeframe="4h")
     conn = connect()
     sync_paper(conn, daily, intraday=intraday)
     publish(conn, daily, intraday)
