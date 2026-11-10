@@ -51,12 +51,12 @@ def test_beginner_page_is_plain_thai_and_uses_the_json():
         "Asia/Bangkok",
         "ไม่ใช้ API key",
         "lightweight-charts@4.2.1",
-        "Sarabun",
     ):
         assert phrase in html, phrase
     assert "Noto+Sans+Thai" in html
+    assert "IBM+Plex+Sans+Thai" in html
     assert "Noto Sans Thai" in css
-    assert "Sarabun" in css
+    assert "IBM Plex Sans Thai" in css
     assert 'fetch("data/dashboard.json")' in js
     assert "const STALE_HOURS = 8" in js
     match = re.search(r"const START_DOLLARS = (\d+);", js)

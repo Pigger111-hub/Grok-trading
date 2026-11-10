@@ -7,52 +7,99 @@
 <meta name="description" content="เงินสมมติของบิตคอยน์และอีเธอเรียม อ่านง่ายสำหรับคนที่ไม่เคยเทรด ไม่รับประกันกำไร" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23102017'/%3E%3C/svg%3E" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%232457d6'/%3E%3C/svg%3E" />
 <link rel="stylesheet" href="dashboard.css" />
 <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body id="top">
 <a class="skip" href="#summary">ข้ามไปที่สรุปเงิน</a>
 
-<div class="banner disclaimer" role="note">
-  <strong>เงินสมมติเท่านั้น ไม่รับประกันกำไร</strong>
-  <p>ตัวเลขทั้งหน้าเป็นการจำลองเท่านั้น ไม่มีคำสั่งซื้อขายจริง และไม่ใช้ API key ผลในอดีตไม่ได้รับประกันว่าอนาคตจะเหมือนเดิม และไม่ได้บอกให้ซื้อหรือขายของจริง</p>
-</div>
-<div id="stale" class="banner warning" role="alert" hidden></div>
-
 <div class="wrap">
-  <header>
-    <p class="eyebrow">สมุดวิจัย</p>
+  <header class="top">
+    <div class="top-row">
+      <p class="eyebrow">สมุดวิจัย</p>
+      <p class="disclaimer-pill" role="note">เงินสมมติเท่านั้น ไม่รับประกันกำไร</p>
+    </div>
     <h1>เงินสมมติของบิตคอยน์และอีเธอเรียม</h1>
-    <p class="lede">เริ่มที่ 10,000 ดอลลาร์ ต่อวิธี ต่อเหรียญ แล้วดูว่าตอนนี้เหลือเท่าไหร่ เทียบกับซื้อครั้งเดียวแล้วถือไว้เฉย ๆ</p>
+    <p class="lede">เริ่มที่ 10,000 ดอลลาร์ต่อวิธี ดูว่าตอนนี้เหลือเท่าไหร่ เทียบกับซื้อแล้วถือเฉย ๆ</p>
   </header>
 
   <p id="page-status" class="status" role="status">กำลังอ่านตัวเลข...</p>
 
-  <section aria-labelledby="updated-title">
-    <h2 id="updated-title">ข้อมูลอัปเดตล่าสุด</h2>
-    <p class="meta">เวลาประเทศไทย (Asia/Bangkok)</p>
-    <ul id="updated-list"></ul>
-    <p id="generated"></p>
-  </section>
+  <p class="updated">
+    <span id="updated-title">ข้อมูลอัปเดตล่าสุด</span>
+    <span class="quiet">เวลาประเทศไทย (Asia/Bangkok)</span>
+  </p>
+  <ul id="updated-list" class="updated-list"></ul>
+  <p id="generated" class="quiet"></p>
 
   <section id="summary" aria-labelledby="summary-title">
-    <h2 id="summary-title">ตอนนี้เงินสมมติเหลือเท่าไหร่</h2>
-    <p>เรียงจากเงินที่เหลือมากไปน้อย ขอบเขียวคือดีที่สุดของเหรียญนั้น เส้นประคือตัวเทียบ ซื้อแล้วถือเฉย ๆ ไม่ได้อยู่ในอันดับ คำว่ากำไรเป็นสีเขียว คำว่าขาดทุนเป็นสีแดง</p>
+    <h2 id="summary-title">ตอนนี้เหลือเท่าไหร่</h2>
+    <p class="quiet">เรียงจากเงินที่เหลือมากไปน้อย สีเขียวคือกำไร สีแดงคือขาดทุน เส้นประบนกราฟคือตัวเทียบ</p>
     <div id="summary-root"></div>
   </section>
 
-  <section id="glossary" aria-labelledby="glossary-title">
-    <h2 id="glossary-title">คำศัพท์สั้น ๆ</h2>
+  <section id="charts" aria-labelledby="charts-title">
+    <h2 id="charts-title">กราฟ</h2>
+    <p class="quiet">เปิดมาให้ดูสามวิธีที่เหลือเงินมากสุด กับเส้นซื้อแล้วถือ ติ๊กเพิ่มได้</p>
+    <div class="switch" role="group" aria-label="เลือกเหรียญบนกราฟ">
+      <button type="button" id="coin-btc" data-asset="BTC" aria-pressed="true">บิตคอยน์</button>
+      <button type="button" id="coin-eth" data-asset="ETH" aria-pressed="false">อีเธอเรียม</button>
+    </div>
+
+    <figure>
+      <h3 id="price-title">ราคา</h3>
+      <p class="quiet">แกนนอนคือเวลาประเทศไทย แกนตั้งคือราคาเป็นดอลลาร์ ลูกศรคือจุดซื้อขายของเส้นค่าเฉลี่ย 200</p>
+      <div id="price" class="chart" role="img" aria-labelledby="price-title"></div>
+      <p class="axis-note quiet">เวลา (ประเทศไทย)</p>
+    </figure>
+
+    <figure>
+      <h3 id="equity-title">เงินสมมติ</h3>
+      <p class="quiet">ทุกเส้นเริ่มที่ 10,000 ดอลลาร์ เส้นสีเน้นคือวิธีที่ดีที่สุด เส้นประสีเทาคือซื้อแล้วถือ</p>
+      <div id="legend" class="legend"></div>
+      <p><button type="button" id="reset-lines" class="texty">กลับไปดูแค่เส้นหลัก</button></p>
+      <div id="equity" class="chart" role="img" aria-labelledby="equity-title"></div>
+      <p class="axis-note quiet">เวลา (ประเทศไทย)</p>
+      <p id="chart-empty" class="quiet" hidden>ยังไม่ได้เลือกเส้น</p>
+    </figure>
+    <p id="chart-error" class="quiet" hidden>กราฟยังโหลดไม่ได้ ต้องต่ออินเทอร์เน็ต ตัวเลขด้านบนยังใช้ได้</p>
+  </section>
+
+  <section id="trades-section" aria-labelledby="trades-title">
+    <h2 id="trades-title">ซื้อขายล่าสุด</h2>
+    <p class="quiet">เวลาประเทศไทย ผลเป็นกำไรหรือขาดทุนของรอบนั้น</p>
+    <div id="trades"></div>
+  </section>
+
+  <details class="fold" id="history">
+    <summary id="history-title">ผลทดสอบเก่า</summary>
+    <p class="quiet">ส่วนนี้ไม่ใช่เงินสมมติด้านบน เป็นช่วงท้ายที่ไม่ได้ใช้เลือกกติกา (out-of-sample) ตัวเลขโตเฉลี่ยต่อปีสูง ไม่ได้แปลว่าตอนนี้กำไร</p>
+    <div id="history-root"></div>
+    <details>
+      <summary>ตัวเลขเพิ่มของช่วงนี้</summary>
+      <p class="quiet">อัตราชนะคือสัดส่วนรอบที่ได้กำไร สูงได้ทั้งที่เงินรวมน้อย คะแนนความคุ้มความเสี่ยงยิ่งสูง แปลว่ากำไรคุ้มกับทางที่เหวี่ยง มันไม่ใช่เปอร์เซ็นต์กำไร</p>
+      <div id="history-extra"></div>
+    </details>
+  </details>
+
+  <details class="fold">
+    <summary id="why-title">ทำไมถึงจำลองสามวิธีนี้</summary>
+    <p class="quiet">เลือกไว้ตั้งแต่รอบวิจัยแรก ไม่ได้เลือกเพราะเป็นตัวที่กำไรสูงสุดบนหน้านี้</p>
+    <div id="reasons"></div>
+  </details>
+
+  <details class="fold">
+    <summary id="glossary-title">ศัพท์ที่ควรรู้</summary>
     <div class="glossary">
       <article id="term-sma">
         <h3>เส้นค่าเฉลี่ย 200 วัน (SMA 200)</h3>
-        <p>เอาราคาปิดย้อนหลัง 200 วันมาหาค่าเฉลี่ย ถ้าราคาปิดวันนี้ยังอยู่เหนือเส้นนี้ กติกาบอกให้ถือเหรียญ ถ้าหลุดเส้น ให้ขายแล้วถือเงินสด แบบที่ดูทุก 4 ชั่วโมงใช้ 200 แท่งของกราฟ 4 ชั่วโมง ประมาณ 33 วัน ไม่ใช่ 200 วัน</p>
+        <p>เอาราคาปิดย้อนหลัง 200 วันมาหาค่าเฉลี่ย ถ้าราคาปิดวันนี้ยังอยู่เหนือเส้นนี้ กติกาบอกให้ถือเหรียญ ถ้าหลุดเส้น ให้ขายแล้วถือเงินสด แบบที่ดูทุก 4 ชั่วโมงใช้ 200 แท่ง ประมาณ 33 วัน ไม่ใช่ 200 วัน</p>
       </article>
       <article id="term-macd">
         <h3>แมคดี (MACD)</h3>
-        <p>เครื่องดูว่าแรงขึ้นหรือแรงลงกำลังเปลี่ยนทาง ถ้าเส้นเร็วอยู่เหนือเส้นช้า ให้ถือเหรียญ ถ้าหลุดให้ถือเงินสด เลข 12, 26 และ 9 คือค่าตามตำรา ไม่ได้จูนให้ตัวเลขสวย</p>
+        <p>เครื่องดูว่าแรงขึ้นหรือแรงลงกำลังเปลี่ยนทาง ถ้าเส้นเร็วอยู่เหนือเส้นช้า ให้ถือเหรียญ ถ้าหลุดให้ถือเงินสด เลข 12, 26 และ 9 คือค่าตามตำรา</p>
       </article>
       <article id="term-donchian">
         <h3>กรอบดอนเชียน (Donchian)</h3>
@@ -60,11 +107,11 @@
       </article>
       <article id="term-bh">
         <h3>ซื้อแล้วถือเฉยๆ</h3>
-        <p>ซื้อครั้งเดียวตอนเริ่ม แล้วไม่ขายเลย เป็นตัวเทียบ ไม่ใช่วิธีที่เราเลือก เพราะใครก็ทำได้โดยไม่ต้องมีสัญญาณ คำอังกฤษคือ buy and hold</p>
+        <p>ซื้อครั้งเดียวตอนเริ่ม แล้วไม่ขายเลย เป็นตัวเทียบ ไม่ใช่วิธีที่เราเลือก</p>
       </article>
       <article id="term-dd">
         <h3>การร่วงจากจุดสูงสุด (drawdown)</h3>
-        <p>เงินเคยขึ้นไปสูงสุดแล้วลดลงกี่เปอร์เซ็นต์ เช่น เคยมี 15,000 ดอลลาร์ แล้วเหลือ 9,000 คือร่วง 40% จากจุดสูงสุด ตัวเลขนี้บอกว่าทางระหว่างทางเจ็บแค่ไหน ไม่ใช่กำไรตอนจบ</p>
+        <p>เงินเคยขึ้นไปสูงสุดแล้วลดลงกี่เปอร์เซ็นต์ เช่น เคยมี 15,000 ดอลลาร์ แล้วเหลือ 9,000 คือร่วง 40% จากจุดสูงสุด</p>
       </article>
       <article id="term-oos">
         <h3>ช่วงที่ไม่ได้ใช้เลือกกติกา (out-of-sample)</h3>
@@ -76,74 +123,13 @@
       </article>
       <article id="term-hold">
         <h3>ถือเหรียญ กับ ถือเงินสด</h3>
-        <p><strong>ถือเหรียญ</strong> คือเงินสมมติอยู่ในเหรียญ ถ้าราคาขึ้น มูลค่าขึ้น ถ้าราคาลง มูลค่าลง <strong>ถือเงินสด</strong> คือขายเหรียญแล้ว เก็บเป็นดอลลาร์ ราคาเหรียญขึ้นหรือลงไม่กระทบก้อนนี้</p>
+        <p><strong>ถือเหรียญ</strong> คือเงินอยู่ในเหรียญ ราคาขึ้นลงมีผล <strong>ถือเงินสด</strong> คือขายแล้ว เก็บเป็นดอลลาร์ ราคาเหรียญขึ้นลงไม่มีผลกับก้อนนี้</p>
       </article>
     </div>
-  </section>
+  </details>
 
-  <section id="charts" aria-labelledby="charts-title">
-    <h2 id="charts-title">กราฟ</h2>
-    <p>เลือกเหรียญก่อน แล้วติ๊กชื่อวิธีที่อยากเห็นเส้น เปิดมาให้ดูสามวิธีที่เหลือเงินมากสุด กับเส้นซื้อแล้วถือเฉย ๆ เส้นที่เหลือปิดไว้ก่อน จะได้ไม่รก</p>
-    <div class="switch" role="group" aria-label="เลือกเหรียญบนกราฟ">
-      <button type="button" id="coin-btc" data-asset="BTC" aria-pressed="true">บิตคอยน์ (BTC)</button>
-      <button type="button" id="coin-eth" data-asset="ETH" aria-pressed="false">อีเธอเรียม (ETH)</button>
-    </div>
-
-    <figure>
-      <h3 id="price-title">ราคา และจุดซื้อขายของเส้นค่าเฉลี่ย 200</h3>
-      <p>แกนนอนคือเวลาประเทศไทย แกนตั้งคือราคาเป็นดอลลาร์ ลูกศรขึ้นคือซื้อ ลูกศรลงคือขาย มีเฉพาะวิธีเส้นค่าเฉลี่ย 200 สีเขียวคือแบบดูทุกวัน สีน้ำเงินคือแบบดูทุก 4 ชั่วโมง</p>
-      <div class="plot">
-        <div class="y-axis-title">ดอลลาร์</div>
-        <div>
-          <div id="price" class="chart" role="img" aria-labelledby="price-title"></div>
-          <p class="axis-note">แกนนอน: เวลา (ประเทศไทย)</p>
-        </div>
-      </div>
-    </figure>
-
-    <figure>
-      <h3 id="equity-title">เงินสมมติ เทียบกับซื้อแล้วถือเฉย ๆ</h3>
-      <p>แกนนอนคือเวลาประเทศไทย แกนตั้งคือเงินสมมติเป็นดอลลาร์ ทุกเส้นเริ่มที่ 10,000 ดอลลาร์ เส้นประคือตัวเทียบ</p>
-      <div id="legend"></div>
-      <p><button type="button" id="reset-lines">กลับไปดูแค่เส้นหลัก</button></p>
-      <div class="plot">
-        <div class="y-axis-title">ดอลลาร์</div>
-        <div>
-          <div id="equity" class="chart" role="img" aria-labelledby="equity-title"></div>
-          <p class="axis-note">แกนนอน: เวลา (ประเทศไทย)</p>
-        </div>
-      </div>
-      <p id="chart-empty" hidden>ยังไม่ได้เลือกเส้น ติ๊กชื่อด้านบนเพื่อดูกราฟ</p>
-    </figure>
-    <p id="chart-error" class="warning-inline" hidden>กราฟยังโหลดไม่ได้ ต้องต่ออินเทอร์เน็ตเพื่อโหลดตัววาดกราฟ ตัวเลขด้านบนยังใช้ได้</p>
-  </section>
-
-  <section id="trades-section" aria-labelledby="trades-title">
-    <h2 id="trades-title">ซื้อขายล่าสุด</h2>
-    <p>แต่ละรายการคือหนึ่งรอบของเงินสมมติ บอกวันเวลาที่ซื้อและขายตามเวลาประเทศไทย และผลของรอบนั้นเป็นกำไรหรือขาดทุนกี่เปอร์เซ็นต์</p>
-    <div id="trades"></div>
-  </section>
-
-  <section id="history" aria-labelledby="history-title">
-    <h2 id="history-title">ผลทดสอบเก่า ช่วงที่ไม่ได้ใช้เลือกกติกา</h2>
-    <p>ส่วนนี้ไม่ใช่เงินสมมติก้อนด้านบน เป็นผลย้อนหลังช่วงท้ายของข้อมูลเก่า เรียกว่า out-of-sample คือช่วงที่ไม่ได้ใช้ตอนเลือกกติกา ตัวเลขโตเฉลี่ยต่อปีสูง ไม่ได้แปลว่าตอนนี้กำไร</p>
-    <div id="history-root"></div>
-    <details>
-      <summary>ตัวเลขเพิ่มของช่วงนี้</summary>
-      <p>อัตราชนะคือสัดส่วนรอบที่ได้กำไร ตัวเลขนี้สูงได้ทั้งที่เงินโดยรวมน้อย เพราะรอบเล็ก ๆ ชนะบ่อย แต่พลาดรอบใหญ่ คะแนนความคุ้มความเสี่ยงยิ่งสูง แปลว่ากำไรคุ้มกับทางที่เหวี่ยงมากกว่า มันไม่ใช่เปอร์เซ็นต์กำไร</p>
-      <div id="history-extra"></div>
-    </details>
-  </section>
-
-  <section aria-labelledby="why-title">
-    <h2 id="why-title">ทำไมถึงจำลองสามวิธีนี้</h2>
-    <p>สามวิธีนี้ถูกเลือกไว้ตั้งแต่รอบวิจัยแรก ไม่ได้เลือกเพราะเป็นตัวที่กำไรสูงสุดบนหน้านี้</p>
-    <div id="reasons"></div>
-  </section>
-
-  <section aria-labelledby="sheets-title">
-    <h2 id="sheets-title">รายงานละเอียดภาษาอังกฤษ</h2>
-    <p>ลิงก์ด้านล่างเป็นรายงานตัวเลขละเอียด เปิดเมื่ออยากดูเพิ่ม ไม่จำเป็นสำหรับการอ่านหน้านี้</p>
+  <details class="fold">
+    <summary id="sheets-title">รายงานละเอียดภาษาอังกฤษ</summary>
     <ul class="links">
       <li><a href="tearsheets/btc_sma_filter.html">บิตคอยน์ เส้น 200 วัน ดูทุกวัน</a></li>
       <li><a href="tearsheets/btc_sma_filter_4h.html">บิตคอยน์ เส้น 200 แท่ง ทุก 4 ชั่วโมง</a></li>
@@ -158,11 +144,11 @@
       <li><a href="tearsheets/eth_donchian.html">อีเธอเรียม ดอนเชียน ดูทุกวัน</a></li>
       <li><a href="tearsheets/eth_donchian_4h.html">อีเธอเรียม ดอนเชียน ทุก 4 ชั่วโมง</a></li>
     </ul>
-  </section>
+  </details>
 
   <footer>
-    <p><strong>เงินสมมติเท่านั้น ไม่รับประกันกำไร</strong></p>
-    <p>นี่คือการจำลองเท่านั้น ไม่มีคำสั่งซื้อขายจริง และไม่ใช้ API key หักค่าธรรมเนียมกับส่วนต่างราคาสมมติไว้แล้ว ไม่มีกรอบ 1 ชั่วโมง เพราะซื้อขายถี่แล้วค่าใช้จ่ายกินกำไร วิธีที่ดูวันละครั้งเปลี่ยนสถานะได้เฉพาะหลังราคาวันนั้นปิด</p>
+    <p>เงินสมมติเท่านั้น ไม่รับประกันกำไร</p>
+    <p>นี่คือการจำลองเท่านั้น ไม่มีคำสั่งซื้อขายจริง และไม่ใช้ API key</p>
     <p><a href="#top">กลับขึ้นด้านบน</a></p>
   </footer>
 </div>

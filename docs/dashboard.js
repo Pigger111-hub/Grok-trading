@@ -13,29 +13,29 @@ const STRATEGY_INFO = {
     caption: "ถือเหรียญเมื่อราคาปิดอยู่เหนือเส้นค่าเฉลี่ย แล้วถือเงินสดเมื่อหลุดเส้น",
     caption4h: "กติกาเดียวกัน แต่คิดจากแท่ง 4 ชั่วโมง 200 แท่ง ประมาณ 33 วัน ไม่ใช่ 200 วัน",
     href: "#term-sma",
-    color1d: "#0a6b30",
-    color4h: "#1f8f4e",
+    color1d: "#4b5563",
+    color4h: "#9ca3af",
   },
   macd: {
     title: "แมคดี (MACD)",
     caption: "ถือเหรียญเมื่อเส้นเร็วอยู่เหนือเส้นช้า แล้วถือเงินสดเมื่อหลุด",
     href: "#term-macd",
-    color1d: "#0b4f8a",
-    color4h: "#1d6fbf",
+    color1d: "#64748b",
+    color4h: "#94a3b8",
   },
   donchian: {
     title: "กรอบดอนเชียน (Donchian)",
     caption: "ซื้อเมื่อราคาทะลุกรอบสูง ขายเมื่อหลุดกรอบต่ำ",
     href: "#term-donchian",
-    color1d: "#8a3d00",
-    color4h: "#c46512",
+    color1d: "#78716c",
+    color4h: "#a8a29e",
   },
   buy_and_hold: {
     title: "ซื้อแล้วถือเฉยๆ",
     caption: "ซื้อครั้งเดียวตอนเริ่ม แล้วไม่ขาย เป็นตัวเทียบ ไม่ใช่วิธีที่เลือก",
     href: "#term-bh",
-    color1d: "#3d4752",
-    color4h: "#3d4752",
+    color1d: "#a3a3a3",
+    color4h: "#a3a3a3",
   },
 };
 
@@ -232,12 +232,53 @@ function el(tag, className, text) {
   return node;
 }
 
+function ticker(asset) {
+  return asset === "BTC" || asset === "ETH" ? asset : String(asset);
+}
+
+function formatChip(unix) {
+  if (unix == null) return "ไม่ทราบเวลา";
+  const date = new Date(Number(unix) * 1000);
+  const day = new Intl.DateTimeFormat("th-TH-u-nu-latn", {
+    timeZone: "Asia/Bangkok",
+    day: "numeric",
+    month: "short",
+  }).format(date);
+  const time = new Intl.DateTimeFormat("th-TH-u-nu-latn", {
+    timeZone: "Asia/Bangkok",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+  return day + " " + time;
+}
+
+function tip(text) {
+  const wrap = el("span", "tip");
+  const button = el("button", "tip-btn", "?");
+  button.type = "button";
+  button.setAttribute("aria-label", "คำอธิบาย");
+  button.setAttribute("aria-expanded", "false");
+  const bubble = el("span", "tip-bubble", text);
+  bubble.setAttribute("role", "tooltip");
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const open = !wrap.classList.contains("open");
+    document.querySelectorAll(".tip.open").forEach((node) => node.classList.remove("open"));
+    wrap.classList.toggle("open", open);
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  wrap.append(button, bubble);
+  return wrap;
+}
+
 function renderUpdated(data) {
   const list = document.getElementById("updated-list");
   list.replaceChildren();
   COINS.forEach((asset) => {
     const unix = latestPriceUnix(data, asset);
-    const item = el("li", "", coinName(asset) + " อัปเดตราคาล่าสุดเมื่อ " + formatUnix(unix));
+    const item = el("li", "update-chip", ticker(asset) + " · " + formatUnix(unix));
     list.append(item);
   });
   const generated = document.getElementById("generated");
@@ -250,23 +291,8 @@ function renderUpdated(data) {
 }
 
 function renderStale(data, nowMs) {
-  const banner = document.getElementById("stale");
   const now = nowMs == null ? Date.now() : nowMs;
-  const stale = COINS.filter((asset) => priceIsStale(latestPriceUnix(data, asset), now));
-  banner.replaceChildren();
-  if (!stale.length) {
-    banner.hidden = true;
-    return stale;
-  }
-  banner.hidden = false;
-  banner.append(el("strong", "", "ข้อมูลราคาเก่ากว่า 8 ชั่วโมง"));
-  const list = document.createElement("ul");
-  stale.forEach((asset) => {
-    list.append(el("li", "", coinName(asset) + " อัปเดตล่าสุดเมื่อ " + formatUnix(latestPriceUnix(data, asset))));
-  });
-  banner.append(list);
-  banner.append(el("p", "", "ตัวเลขของเหรียญที่ขึ้นชื่อนี้ใช้ราคาเก่า อาจไม่ตรงกับราคาตอนนี้ หน้านี้แค่เตือนไว้ ไม่ได้ไปแก้ระบบดึงราคา"));
-  return stale;
+  return COINS.filter((asset) => priceIsStale(latestPriceUnix(data, asset), now));
 }
 
 function bestBadge(row, benchmark) {
@@ -293,32 +319,51 @@ function coinLead(ranked) {
   return text;
 }
 
+function renderHero(row, benchmark) {
+  const info = strategyInfo(row.strategy, row.timeframe);
+  const hold = holdingOf(row);
+  const pnl = describePnl(row.value);
+  const hero = el("article", "hero");
+  const kicker = el("p", "kicker");
+  kicker.append(document.createTextNode("ดีที่สุด · " + info.title + " · " + clockLabel(row.timeframe)));
+  kicker.append(tip(info.caption));
+  hero.append(kicker);
+  hero.append(el("p", "hero-money num", dollars(row.value)));
+  hero.append(el("p", "hero-pnl num " + pnl.tone, pnl.label));
+  const meta = el("p", "hero-meta");
+  meta.append(document.createTextNode(hold.title));
+  if (benchmark && benchmark.value != null) {
+    meta.append(document.createTextNode(" · " + describeGap(row.value, benchmark.value).label));
+  }
+  hero.append(meta);
+  return hero;
+}
+
 function renderStrategyCard(row, rank, benchmark) {
   const info = strategyInfo(row.strategy, row.timeframe);
   const hold = holdingOf(row);
   const pnl = describePnl(row.value);
-  const card = el("article", rank === 1 ? "card best" : "card");
-  if (rank === 1) card.append(el("p", "badge", bestBadge(row)));
-  else card.append(el("p", "badge", "อันดับ " + rank));
+  const card = el("article", "card");
+  const top = el("div", "card-top");
   const title = el("h3");
   const link = el("a", "", info.title);
   link.href = info.href;
   title.append(link);
-  card.append(title);
-  card.append(el("p", "meta", clockLabel(row.timeframe)));
-  card.append(el("p", "caption", info.caption));
-  card.append(el("p", "money " + pnl.tone, dollars(row.value)));
-  card.append(el("p", "pnl " + pnl.tone, pnl.label));
-  card.append(el("p", "", "จากเงินเริ่ม 10,000 ดอลลาร์"));
-  const status = el("p", "");
-  status.append("ตอนนี้ ");
-  status.append(el("span", "pill " + hold.klass, hold.title));
-  status.append(" " + hold.caption);
-  card.append(status);
+  title.append(tip(info.caption));
+  top.append(title);
+  top.append(el("span", "rank", "อันดับ " + rank));
+  card.append(top);
+  card.append(el("p", "quiet", clockLabel(row.timeframe)));
+  const rowLine = el("div", "card-row");
+  rowLine.append(el("p", "card-money num", dollars(row.value)));
+  rowLine.append(el("p", "pnl num " + pnl.tone, pnl.label));
+  card.append(rowLine);
+  const meta = el("p", "quiet");
+  meta.append(document.createTextNode(hold.title));
   if (benchmark && benchmark.value != null) {
-    const gap = describeGap(row.value, benchmark.value);
-    card.append(el("p", "versus " + gap.tone, gap.label));
+    meta.append(document.createTextNode(" · " + describeGap(row.value, benchmark.value).label));
   }
+  card.append(meta);
   return card;
 }
 
@@ -326,22 +371,20 @@ function renderBenchmarkCard(row) {
   const info = strategyInfo(row.strategy, row.timeframe);
   const hold = holdingOf(row);
   const pnl = describePnl(row.value);
-  const card = el("article", "card bench");
-  card.append(el("p", "badge bench", "ตัวเทียบ ไม่ได้อยู่ในอันดับ"));
+  const card = el("article", "bench");
+  const top = el("div", "bench-top");
   const title = el("h3");
-  const link = el("a", "", info.title);
+  const link = el("a", "", "ตัวเทียบ · " + info.title);
   link.href = info.href;
   title.append(link);
-  card.append(title);
-  card.append(el("p", "caption", info.caption));
-  card.append(el("p", "money " + pnl.tone, dollars(row.value)));
-  card.append(el("p", "pnl " + pnl.tone, pnl.label));
-  card.append(el("p", "", "จากเงินเริ่ม 10,000 ดอลลาร์"));
-  const status = el("p", "");
-  status.append("ตอนนี้ ");
-  status.append(el("span", "pill " + hold.klass, hold.title));
-  status.append(" " + hold.caption);
-  card.append(status);
+  title.append(tip(info.caption));
+  top.append(title);
+  card.append(top);
+  const rowLine = el("div", "card-row");
+  rowLine.append(el("p", "card-money num", dollars(row.value)));
+  rowLine.append(el("p", "pnl num " + pnl.tone, pnl.label));
+  card.append(rowLine);
+  card.append(el("p", "quiet", hold.title));
   return card;
 }
 
@@ -351,14 +394,16 @@ function renderSummary(data, staleAssets) {
   COINS.forEach((asset) => {
     const ranked = rankRows(rowsFor(data, asset));
     const block = el("div", "coin");
-    block.append(el("h3", "", coinName(asset)));
+    const head = el("div", "coin-head");
+    head.append(el("h3", "", coinName(asset)));
     if (staleAssets.indexOf(asset) !== -1) {
-      block.append(el("p", "warning-inline", "ราคาของเหรียญนี้เก่ากว่า 8 ชั่วโมง ตัวเลขด้านล่างอาจไม่ทันราคาตอนนี้"));
+      head.append(el("p", "chip amber", ticker(asset) + " ราคาค้าง · อัปเดตล่าสุด " + formatChip(latestPriceUnix(data, asset))));
     }
-    block.append(el("p", "coin-lead", coinLead(ranked)));
+    block.append(head);
+    if (ranked.best) block.append(renderHero(ranked.best, ranked.benchmark));
     const cards = el("div", "cards");
-    ranked.rows.forEach((row, index) => {
-      cards.append(renderStrategyCard(row, index + 1, ranked.benchmark));
+    ranked.rows.slice(1).forEach((row, index) => {
+      cards.append(renderStrategyCard(row, index + 2, ranked.benchmark));
     });
     if (ranked.benchmark) cards.append(renderBenchmarkCard(ranked.benchmark));
     block.append(cards);
@@ -384,22 +429,29 @@ function renderTrades(data) {
   const root = document.getElementById("trades");
   const trades = data.trades || [];
   if (!trades.length) {
-    root.replaceChildren(el("p", "", "ยังไม่มีรายการซื้อขาย"));
+    root.replaceChildren(el("p", "quiet", "ยังไม่มีรายการซื้อขาย"));
     return;
   }
-  const stack = el("div", "stack");
+  const list = el("div", "trades");
   trades.forEach((row) => {
     const info = strategyInfo(row.strategy, row.timeframe);
     const result = tradeResult(row);
-    const card = el("article", "row-card");
-    card.append(el("h3", "", coinName(row.asset) + " · " + info.title));
-    card.append(el("p", "meta", clockLabel(row.timeframe)));
-    card.append(el("p", "", "ซื้อเมื่อ " + formatStamp(row.entry_date)));
-    card.append(el("p", "", row.closed ? "ขายเมื่อ " + formatStamp(row.exit_date) : "ยังไม่ขาย ถือเหรียญอยู่"));
-    card.append(el("p", "pnl " + result.tone, result.label));
-    stack.append(card);
+    const item = el("article", "trade");
+    const when = el("div", "trade-when");
+    when.append(el("span", "tag buy", "ซื้อ"));
+    when.append(el("span", "num", formatStamp(row.entry_date)));
+    if (row.closed) {
+      when.append(el("span", "tag sell", "ขาย"));
+      when.append(el("span", "num", formatStamp(row.exit_date)));
+    } else {
+      when.append(el("span", "tag hold", "ถืออยู่"));
+    }
+    item.append(when);
+    item.append(el("div", "trade-what", ticker(row.asset) + " · " + info.title + " · " + clockLabel(row.timeframe)));
+    item.append(el("div", "pnl num " + result.tone, result.label));
+    list.append(item);
   });
-  root.replaceChildren(stack);
+  root.replaceChildren(list);
 }
 
 function plainHistoryName(row) {
@@ -434,38 +486,36 @@ function renderHistory(data) {
       .slice()
       .sort((a, b) => Number(b.cagr) - Number(a.cagr));
     root.append(el("h3", "", coinName(asset)));
-    const stack = el("div", "stack");
-    const extraStack = el("div", "stack");
-    if (!group.length) stack.append(el("p", "", "ไม่มีผลทดสอบของเหรียญนี้"));
+    const table = el("table", "mini");
+    const head = document.createElement("tr");
+    ["อันดับ", "วิธี", "โตเฉลี่ยต่อปี", "ร่วงจากจุดสูงสุด", "ครั้ง"].forEach((label) => head.append(el("th", "", label)));
+    table.append(head);
     group.forEach((row, index) => {
       const growth = signedPercent(row.cagr);
       const drop = signedPercent(row.max_drawdown);
-      const card = el("article", index === 0 ? "row-card best" : "row-card");
-      card.append(el("p", "badge" + (index === 0 ? "" : ""), index === 0 ? "อันดับ 1 ของช่วงทดสอบเก่า" : "อันดับ " + (index + 1)));
-      card.append(el("h3", "", plainHistoryName(row)));
-      card.append(el("p", "meta", clockLabel(row.timeframe)));
-      if (growth) {
-        const word = growth.raw >= 0 ? "โตเฉลี่ยปีละ " : "หดเฉลี่ยปีละ ";
-        card.append(el("p", "pnl " + growth.tone, word + growth.shown + "%"));
-      }
-      if (drop) card.append(el("p", "bad", "ร่วงจากจุดสูงสุด (drawdown) " + drop.shown + "%"));
-      card.append(el("p", "", "ซื้อขาย " + row.n_trades + " ครั้ง"));
-      if (STRATEGY_INFO[row.strategy] && row.strategy !== "buy_and_hold") {
-        card.append(el("p", "caption", "วิธีนี้มีในเงินสมมติด้านบนด้วย"));
-      }
-      stack.append(card);
-
-      const more = el("article", "row-card");
-      more.append(el("h3", "", coinName(asset) + " · " + plainHistoryName(row) + " · " + clockLabel(row.timeframe)));
-      const win = signedPercent(row.win_rate);
-      more.append(el("p", "", win ? "รอบที่ได้กำไร " + win.shown + "% ของรอบทั้งหมด" : "ไม่มีอัตราชนะ"));
-      const sharpe = row.sharpe == null ? "ไม่มี" : numberText(Number(row.sharpe), 2);
-      more.append(el("p", "", "คะแนนความคุ้มความเสี่ยง " + sharpe));
-      extraStack.append(more);
+      const line = document.createElement("tr");
+      line.append(el("td", "num", String(index + 1)));
+      line.append(el("td", "", plainHistoryName(row) + " · " + clockLabel(row.timeframe)));
+      const growthCell = el("td", "num" + (growth ? " " + growth.tone : ""));
+      growthCell.textContent = growth ? (growth.raw >= 0 ? "+" : "−") + growth.shown + "%" : "—";
+      line.append(growthCell);
+      line.append(el("td", "num", drop ? drop.shown + "%" : "—"));
+      line.append(el("td", "num", String(row.n_trades)));
+      table.append(line);
     });
-    root.append(stack);
+    if (!group.length) root.append(el("p", "quiet", "ไม่มีผลทดสอบของเหรียญนี้"));
+    else root.append(table);
     extra.append(el("h3", "", coinName(asset)));
-    extra.append(extraStack);
+    const extraTable = el("table", "mini");
+    group.forEach((row) => {
+      const win = signedPercent(row.win_rate);
+      const line = document.createElement("tr");
+      line.append(el("td", "", plainHistoryName(row) + " · " + clockLabel(row.timeframe)));
+      line.append(el("td", "num", win ? "ชนะ " + win.shown + "%" : "—"));
+      line.append(el("td", "num", row.sharpe == null ? "—" : numberText(Number(row.sharpe), 2)));
+      extraTable.append(line);
+    });
+    extra.append(extraTable);
   });
 }
 
@@ -477,9 +527,9 @@ function renderReasons(data) {
     if (seen.has(row.strategy)) return;
     seen.add(row.strategy);
     const info = strategyInfo(row.strategy, "1d");
-    const card = el("article", "row-card");
+    const card = el("article", "");
     card.append(el("h3", "", info.title));
-    card.append(el("p", "", row.why_th || ""));
+    card.append(el("p", "quiet", row.why_th || ""));
     stack.append(card);
   });
   if (!seen.size) stack.append(el("p", "", "ไม่มีคำอธิบาย"));
@@ -540,9 +590,11 @@ function renderLegend(data) {
       else visible.delete(key);
       drawEquity(data);
     });
+    const palette = theme();
+    const color = key === bestKey ? palette.accent : benchmark ? palette.bench : info.color;
     const swatch = el("span", benchmark ? "swatch dashed" : "swatch");
-    swatch.style.background = info.color;
-    swatch.style.color = info.color;
+    swatch.style.background = color;
+    swatch.style.color = color;
     const copy = el("span", "legend-copy");
     const name = benchmark ? "ตัวเทียบ: " + info.title : info.title;
     const suffix = key === bestKey ? " · ดีที่สุดตอนนี้" : "";
@@ -554,23 +606,50 @@ function renderLegend(data) {
   });
 }
 
+function theme() {
+  const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (dark) {
+    return {
+      bg: "#1a1a1a",
+      text: "#f4f4f4",
+      grid: "rgba(255,255,255,0.06)",
+      scale: "#3a3a3a",
+      up: "#3dd68c",
+      down: "#ff8d8d",
+      accent: "#8eb0ff",
+      bench: "#8a8a8a",
+    };
+  }
+  return {
+    bg: "#ffffff",
+    text: "#171717",
+    grid: "rgba(23,23,23,0.06)",
+    scale: "#e6e6e4",
+    up: "#157a3b",
+    down: "#c43131",
+    accent: "#2457d6",
+    bench: "#a3a3a3",
+  };
+}
+
 function chartOptions(elNode) {
+  const colors = theme();
   return {
     width: elNode.clientWidth || 320,
-    height: elNode.clientHeight || 420,
+    height: elNode.clientHeight || 380,
     layout: {
-      background: { color: "#ffffff" },
-      textColor: "#102017",
-      fontFamily: '"Noto Sans Thai", Sarabun, sans-serif',
-      fontSize: 18,
+      background: { color: colors.bg },
+      textColor: colors.text,
+      fontFamily: '"IBM Plex Sans Thai", "Noto Sans Thai", sans-serif',
+      fontSize: 16,
     },
     grid: {
-      vertLines: { color: "#e1e8e4" },
-      horzLines: { color: "#e1e8e4" },
+      vertLines: { visible: false },
+      horzLines: { color: colors.grid },
     },
-    rightPriceScale: { borderColor: "#5c6b64" },
+    rightPriceScale: { borderColor: colors.scale },
     timeScale: {
-      borderColor: "#5c6b64",
+      borderColor: colors.scale,
       timeVisible: true,
       secondsVisible: false,
       tickMarkFormatter: (time, tickMarkType) => tickLabel(time, tickMarkType),
@@ -622,13 +701,8 @@ function watchChart(node, chart) {
 }
 
 function markerColor(text) {
-  const label = String(text || "");
-  const intraday = label.indexOf("4") !== -1;
-  const sell = label.indexOf("ขาย") !== -1;
-  if (sell && intraday) return "#8a3d00";
-  if (sell) return "#9d1c1c";
-  if (intraday) return "#0b4f8a";
-  return "#0a6b30";
+  const colors = theme();
+  return String(text || "").indexOf("ขาย") !== -1 ? colors.down : colors.accent;
 }
 
 function drawPrice(data) {
@@ -644,13 +718,14 @@ function drawPrice(data) {
   node.replaceChildren();
   priceChart = LightweightCharts.createChart(node, chartOptions(node));
   priceObserver = watchChart(node, priceChart);
+  const colors = theme();
   const series = priceChart.addCandlestickSeries({
-    upColor: "#0a6b30",
-    downColor: "#9d1c1c",
-    borderUpColor: "#0a6b30",
-    borderDownColor: "#9d1c1c",
-    wickUpColor: "#0a6b30",
-    wickDownColor: "#9d1c1c",
+    upColor: colors.up,
+    downColor: colors.down,
+    borderUpColor: colors.up,
+    borderDownColor: colors.down,
+    wickUpColor: colors.up,
+    wickDownColor: colors.down,
   });
   const candles = (data.candles && data.candles[currentAsset]) || [];
   series.setData(candles);
@@ -701,12 +776,13 @@ function drawEquity(data) {
     const parts = key.split("|");
     const info = strategyInfo(parts[0], parts[1]);
     const benchmark = parts[0] === "buy_and_hold";
+    const palette = theme();
     const series = equityChart.addLineSeries({
-      color: info.color,
-      lineWidth: key === bestKey ? 4 : 2,
+      color: key === bestKey ? palette.accent : benchmark ? palette.bench : info.color,
+      lineWidth: key === bestKey ? 2 : 1,
       lineStyle: benchmark ? 2 : 0,
       priceLineVisible: false,
-      lastValueVisible: true,
+      lastValueVisible: false,
     });
     series.setData(equityDollars(book[key]));
   });
@@ -736,6 +812,22 @@ function setupCharts(data) {
   const start = () => showAsset(data, currentAsset);
   const fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
   Promise.race([fonts, new Promise((resolve) => setTimeout(resolve, 1500))]).then(start);
+  if (window.matchMedia) {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const redraw = () => {
+      renderLegend(data);
+      drawPrice(data);
+      drawEquity(data);
+    };
+    if (media.addEventListener) media.addEventListener("change", redraw);
+  }
+  document.addEventListener("click", () => {
+    document.querySelectorAll(".tip.open").forEach((node) => {
+      node.classList.remove("open");
+      const button = node.querySelector("button");
+      if (button) button.setAttribute("aria-expanded", "false");
+    });
+  });
 }
 
 function renderPage(data, nowMs) {
