@@ -69,6 +69,32 @@ def test_beginner_page_is_plain_thai_and_uses_the_json():
     assert payload["equity"]["BTC"] and payload["equity"]["ETH"]
 
 
+def test_weekly_sma_filter_is_not_on_the_paper_dashboard(tmp_path):
+    conn = connect(tmp_path / "lab.sqlite")
+    bars = _market()
+    sync_paper(conn, {"BTC": bars, "ETH": bars.copy()}, start="2025-01-10")
+    conn.execute(
+        """
+        INSERT INTO backtest_results (
+            asset, timeframe, strategy, experiment, params, total_return, cagr,
+            max_drawdown, sharpe, win_rate, n_trades, exposure, bh_total_return,
+            bh_sharpe, bh_max_drawdown, beat_bh_return, beat_bh_sharpe
+        ) VALUES
+            ('BTC', '1d', 'sma_filter_weekly', 'oos_default', '{"window": 200}',
+             1.0, 0.2, -0.3, 0.5, 0.3, 4, 0.5, 0.4, 0.4, -0.5, 1, 1),
+            ('BTC', '1d', 'sma_filter', 'oos_default', '{"window": 200}',
+             2.0, 0.3, -0.2, 0.8, 0.3, 9, 0.6, 0.4, 0.4, -0.5, 1, 1)
+        """
+    )
+    set_meta(conn, "price_as_of", "2025-02-09")
+    write_dashboard(conn, {"BTC": bars, "ETH": bars.copy()}, folder=tmp_path / "docs")
+    data = json.loads((tmp_path / "docs" / "data" / "dashboard.json").read_text(encoding="utf-8"))
+    shown = {row["strategy"] for row in data["leaderboard"]}
+    assert "sma_filter" in shown
+    assert "sma_filter_weekly" not in shown
+    assert "sma_filter_weekly" not in json.dumps(data)
+
+
 def test_write_dashboard_keeps_the_beginner_shell(tmp_path):
     conn = connect(tmp_path / "lab.sqlite")
     bars = _market()

@@ -78,3 +78,58 @@ def test_every_signal_strategy_is_long_or_flat_or_warmup():
         finite = sig.dropna()
         assert set(finite.unique()).issubset({0.0, 1.0})
         assert finite.isna().sum() == 0
+
+
+def _state_changed(previous, current) -> bool:
+    previous_missing = pd.isna(previous)
+    current_missing = pd.isna(current)
+    if previous_missing and current_missing:
+        return False
+    if previous_missing or current_missing:
+        return True
+    return float(previous) != float(current)
+
+
+def test_sma_filter_weekly_changes_state_only_on_every_seventh_bar():
+    """The weekly filter may adopt a new target only on bars 0, 7, 14, ...
+
+    Between those bars it keeps the previous target, even when the daily
+    close-versus-SMA signal has already flipped. The target on a decision
+    bar is that bar's own daily signal, not a later one.
+    """
+    # Window 4 is valid from index 3. Index 7 is the first decision bar with
+    # a real average. The close jumps above that average on bar 7, then falls
+    # through it on bar 8. A weekly check must stay long until bar 14.
+    close = [10.0] * 7 + [14.0] + [1.0] * 14
+    idx = pd.date_range("2020-01-01", periods=len(close), freq="D")
+    bars = pd.DataFrame({"open": close, "high": close, "low": close, "close": close}, index=idx)
+    daily = STRATEGIES_BY_ID["sma_filter"].generate(bars, window=4)
+    weekly = STRATEGIES_BY_ID["sma_filter_weekly"].generate(bars, window=4)
+
+    assert weekly.iloc[:7].isna().all()
+    assert daily.iloc[7] == 1
+    assert weekly.iloc[7] == 1
+    assert daily.iloc[8] == 0
+    assert list(weekly.iloc[8:14]) == [1.0] * 6
+    assert weekly.iloc[14] == daily.iloc[14] == 0
+
+    for i in range(len(weekly)):
+        if i % 7 == 0 and pd.notna(daily.iloc[i]):
+            assert weekly.iloc[i] == daily.iloc[i]
+        if i > 0 and _state_changed(weekly.iloc[i - 1], weekly.iloc[i]):
+            assert i % 7 == 0
+
+
+def test_sma_filter_weekly_does_not_look_ahead():
+    strategy = STRATEGIES_BY_ID["sma_filter_weekly"]
+    bars = _market(420, seed=11)
+    full = strategy.generate(bars, **strategy.default_params)
+    for t in (199, 206, 250, 419):
+        prefix = strategy.generate(bars.iloc[: t + 1], **strategy.default_params)
+        pd.testing.assert_series_equal(prefix, full.iloc[: t + 1], check_names=False)
+
+    shocked = bars.copy()
+    shocked.iloc[300:] = shocked.iloc[300:].to_numpy() * 3
+    before = strategy.generate(bars.iloc[:300], **strategy.default_params)
+    after = strategy.generate(shocked, **strategy.default_params).iloc[:300]
+    pd.testing.assert_series_equal(before, after, check_names=False)

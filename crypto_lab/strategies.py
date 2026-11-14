@@ -40,6 +40,31 @@ def sma_filter_signal(bars: pd.DataFrame, window: int = 200) -> pd.Series:
     return long.where(average.notna())
 
 
+# Fixed on purpose. This round does not search the check interval or the window.
+WEEKLY_CHECK_BARS = 7
+
+
+def sma_filter_weekly_signal(bars: pd.DataFrame, window: int = 200) -> pd.Series:
+    """Same close-versus-SMA target as the daily filter, sampled every 7 bars.
+
+    Bar i may copy that bar's own daily signal only when i is a multiple of 7.
+    Every other bar repeats the last copied target. The copy uses the close
+    and the average known on bar i. The engine still fills the order at the
+    next bar's open. Before the first multiple of 7 that already has an
+    average, the target is missing, which the engine treats as cash.
+    """
+    daily = sma_filter_signal(bars, window=int(window))
+    values = daily.to_numpy(dtype=float)
+    sampled = np.full(len(values), np.nan)
+    held = np.nan
+    for i, value in enumerate(values):
+        if i % WEEKLY_CHECK_BARS == 0 and not np.isnan(value):
+            held = float(value)
+        if not np.isnan(held):
+            sampled[i] = held
+    return pd.Series(sampled, index=bars.index)
+
+
 def rsi_signal(
     bars: pd.DataFrame,
     period: int = 14,
@@ -141,6 +166,27 @@ STRATEGIES = [
         default_params={"window": 200},
         grid=tuple({"window": window} for window in (100, 150, 200, 250)),
         generate=sma_filter_signal,
+    ),
+    Strategy(
+        id="sma_filter_weekly",
+        kind="signal",
+        name_en="Price above 200-day SMA, checked every 7 bars",
+        name_th="เส้น 200 วัน ตรวจทุก 7 แท่ง",
+        claim_th=(
+            "กติกาเดียวกับถือเมื่อราคาปิดอยู่เหนือเส้น 200 วัน "
+            "แต่ให้เปลี่ยนสถานะได้เฉพาะทุก ๆ 7 แท่ง โดยใช้สัญญาณของแท่งนั้น "
+            "ระหว่างทางให้คงสถานะเดิม เพื่อลดการซื้อขายตอนราคาคร่อมเส้น"
+        ),
+        source_th=(
+            "สัญญาณรายวันมาจากกติกาเดียวกับ sma_filter ซึ่งชุมชนคริปโตเล่าจากแนว "
+            "Meb Faber, \"A Quantitative Approach to Tactical Asset Allocation\" "
+            "(2007, ปรับปรุง 2013). Faber ตรวจเป็นรายเดือนบนเส้นประมาณ 10 เดือน "
+            "ไม่ได้กำหนดให้เช็คทุก 7 แท่งรายวัน. ช่วง 7 แท่งเป็นคำถามของห้องนี้ "
+            "จากการทดลองที่ 2 ไม่ใช่ค่าที่ค้นจากข้อมูล และหน้าต่างยังล็อกที่ 200 วัน"
+        ),
+        default_params={"window": 200},
+        grid=({"window": 200},),
+        generate=sma_filter_weekly_signal,
     ),
     Strategy(
         id="rsi",
