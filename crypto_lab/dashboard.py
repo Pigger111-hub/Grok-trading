@@ -131,6 +131,9 @@ def build_payload(conn: sqlite3.Connection, prices: dict[str, pd.DataFrame]) -> 
             for name, points in strategies.items()
         }
 
+    # The weekly 200-day check is a research result only. It stays out of the
+    # paper book and this page until a later round decides to track it.
+    research_only = {"sma_filter_weekly"}
     leaderboard = []
     for row in _records(
         conn,
@@ -141,6 +144,8 @@ def build_payload(conn: sqlite3.Connection, prices: dict[str, pd.DataFrame]) -> 
         ORDER BY asset, timeframe, strategy
         """,
     ):
+        if row["strategy"] in research_only:
+            continue
         leaderboard.append(
             {
                 "asset": row["asset"],

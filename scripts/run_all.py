@@ -27,7 +27,11 @@ def main() -> None:
         run_research(intraday, timeframe="4h", write_summary=False),
     ]
     summary = pd.concat(summaries, ignore_index=True)
-    persist_summary(summary)
+    folds = pd.concat(
+        [pd.read_csv(ROOT / "results" / f"folds_{timeframe}.csv") for timeframe in ("1d", "4h")],
+        ignore_index=True,
+    )
+    persist_summary(summary, folds)
     conn = connect()
     save_backtests(conn, summary)
     sweeps = [
