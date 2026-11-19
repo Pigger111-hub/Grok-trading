@@ -61,8 +61,15 @@ def test_beginner_page_is_plain_thai_and_uses_the_json():
     assert "const STALE_HOURS = 8" in js
     match = re.search(r"const START_DOLLARS = (\d+);", js)
     assert match and int(match.group(1)) == int(INITIAL_CASH)
-    sizes = [int(size) for size in re.findall(r"font-size:\s*(\d+)px", css)]
-    assert sizes and min(sizes) >= 16
+    # Text sizes are rem on a 112.5% root (18px), so nothing may drop below 16px.
+    root = re.search(r"html\s*\{\s*font-size:\s*([\d.]+)%", css)
+    assert root and float(root.group(1)) >= 100
+    root_px = 16 * float(root.group(1)) / 100
+    rem_sizes = [float(size) for size in re.findall(r"--text-[a-z0-9]+:\s*([\d.]+)rem", css)]
+    px_sizes = [int(size) for size in re.findall(r"font-size:\s*(\d+)px", css)]
+    assert rem_sizes
+    assert min(rem_sizes) * root_px >= 15.99
+    assert not px_sizes or min(px_sizes) >= 16
     payload = json.loads((ROOT / "docs" / "data" / "dashboard.json").read_text(encoding="utf-8"))
     assert set(payload["candles"]) >= {"BTC", "ETH"}
     assert payload["positions"]
@@ -147,6 +154,65 @@ const gain = dash.describePnl(16027);
 if (gain.tone !== "good" || gain.label.indexOf("กำไร") === -1) process.exit(15);
 const gap = dash.describeGap(9658, 8051);
 if (gap.tone !== "good" || gap.label.indexOf("มากกว่าซื้อแล้วถือ") === -1) process.exit(16);
+"""
+    completed = subprocess.run(
+        [node, "-e", script],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+
+
+def test_page_reports_the_last_24_hours_from_the_equity_series():
+    node = shutil.which("node")
+    assert node, "node is required to check the page's 24-hour helpers"
+    script = r"""
+const path = require("path");
+const dash = require(path.resolve("docs/dashboard.js"));
+const day = 86400;
+const t0 = 1795075200;
+const pts = (before, now) => [
+  {time: t0 - 2 * day, value: 100},
+  {time: t0 - day, value: before},
+  {time: t0 - 4 * 3600, value: (before + now) / 2},
+  {time: t0, value: now},
+];
+const book = {
+  "sma_filter|1d": pts(90, 95),
+  "macd|1d": pts(92, 91),
+  "buy_and_hold|4h": pts(80, 70),
+};
+if (dash.equityAt(book["macd|1d"], t0 - day) !== 9200) process.exit(2);
+if (dash.equityAt(book["macd|1d"], t0 - 3 * day) !== null) process.exit(3);
+const ch = dash.dayChanges(book);
+if (Math.round(ch["sma_filter|1d"].diff) !== 500) process.exit(4);
+if (Math.abs(ch["buy_and_hold|4h"].pct + 12.5) > 1e-9) process.exit(5);
+const rows = [
+  {strategy: "sma_filter", timeframe: "1d", cash: 9500, market_value: 0},
+  {strategy: "macd", timeframe: "1d", cash: 9100, market_value: 0},
+  {strategy: "buy_and_hold", timeframe: "4h", cash: 0, market_value: 7000},
+];
+const moves = dash.rankMoves(rows, book);
+if (moves["sma_filter|1d"] !== 1 || moves["macd|1d"] !== -1) process.exit(6);
+if ("buy_and_hold|4h" in moves) process.exit(7);
+const trades = [
+  {asset: "BTC", strategy: "macd", timeframe: "4h", entry_date: "2026-11-19T00:00:00", exit_date: "2026-11-19T08:00:00", closed: 0},
+  {asset: "BTC", strategy: "macd", timeframe: "4h", entry_date: "2026-11-10T00:00:00", exit_date: "2026-11-18T20:00:00", closed: 1, return_pct: -0.02},
+  {asset: "ETH", strategy: "sma_filter", timeframe: "1d", entry_date: "2026-11-01", exit_date: "2026-11-05", closed: 1},
+];
+const until = Date.parse("2026-11-19T08:00:00Z") / 1000;
+const events = dash.recentTradeEvents(trades, until - day, until);
+if (events.length !== 2) process.exit(8);
+if (events[0].kind !== "buy" || events[1].kind !== "sell") process.exit(9);
+const counts = dash.headlineCounts({positions: [
+  {asset: "BTC", strategy: "sma_filter", timeframe: "1d", cash: 10500, market_value: 0},
+  {asset: "BTC", strategy: "macd", timeframe: "1d", cash: 9000, market_value: 0},
+  {asset: "BTC", strategy: "buy_and_hold", timeframe: "4h", cash: 0, market_value: 9500},
+  {asset: "ETH", strategy: "macd", timeframe: "1d", cash: 8000, market_value: 0},
+]});
+if (counts.total !== 3 || counts.above !== 1 || counts.beatHold !== 1) process.exit(10);
 """
     completed = subprocess.run(
         [node, "-e", script],
