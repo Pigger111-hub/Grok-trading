@@ -2,47 +2,62 @@
 <html lang="th">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#4f5a2a" />
 <title>สมุดวิจัย BTC / ETH — เงินสมมติ</title>
 <meta name="description" content="เงินสมมติของบิตคอยน์และอีเธอเรียม อ่านง่ายสำหรับคนที่ไม่เคยเทรด ไม่รับประกันกำไร" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%232457d6'/%3E%3C/svg%3E" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%234f5a2a'/%3E%3C/svg%3E" />
 <link rel="stylesheet" href="dashboard.css" />
 <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body id="top">
-<a class="skip" href="#summary">ข้ามไปที่สรุปเงิน</a>
+<a class="skip" href="#standings">ข้ามไปที่ตารางอันดับ</a>
 
-<div class="wrap">
-  <header class="top">
-    <div class="top-row">
-      <p class="eyebrow">สมุดวิจัย</p>
+<header class="band">
+  <div class="band-inner">
+    <div class="band-top">
+      <p class="brand">สมุดวิจัย</p>
       <p class="disclaimer-pill" role="note">เงินสมมติเท่านั้น ไม่รับประกันกำไร</p>
     </div>
     <h1>เงินสมมติของบิตคอยน์และอีเธอเรียม</h1>
-    <p class="lede">เริ่มที่ 10,000 ดอลลาร์ต่อวิธี ดูว่าตอนนี้เหลือเท่าไหร่ เทียบกับซื้อแล้วถือเฉย ๆ</p>
-  </header>
+    <p id="headline" class="headline" aria-live="polite">กำลังอ่านตัวเลข...</p>
+    <p class="lede">ทุกวิธีเริ่มที่ 10,000 ดอลลาร์ ตั้งแต่ 1 ม.ค. 2025 ดูว่าตอนนี้ใครนำ ใครตาม และใครยังอยู่เหนือเส้นเริ่ม</p>
+    <div id="race" class="race"></div>
+    <div class="updated">
+      <p><span id="updated-title">ข้อมูลอัปเดตล่าสุด</span> <span class="band-quiet">เวลาประเทศไทย (Asia/Bangkok)</span></p>
+      <ul id="updated-list" class="updated-list"></ul>
+      <p id="generated" class="band-quiet"></p>
+    </div>
+  </div>
+</header>
 
-  <p id="page-status" class="status" role="status">กำลังอ่านตัวเลข...</p>
+<main class="wrap">
+  <p id="page-status" class="status" role="status" hidden></p>
 
-  <p class="updated">
-    <span id="updated-title">ข้อมูลอัปเดตล่าสุด</span>
-    <span class="quiet">เวลาประเทศไทย (Asia/Bangkok)</span>
-  </p>
-  <ul id="updated-list" class="updated-list"></ul>
-  <p id="generated" class="quiet"></p>
+  <section id="changes" aria-labelledby="changes-title">
+    <div class="section-head">
+      <h2 id="changes-title">24 ชั่วโมงที่ผ่านมา</h2>
+      <p class="quiet">เทียบกับเวลาเดียวกันเมื่อวาน อันดับ เงิน และการซื้อขายที่เกิดขึ้น</p>
+    </div>
+    <div id="changes-root"></div>
+  </section>
 
-  <section id="summary" aria-labelledby="summary-title">
-    <h2 id="summary-title">ตอนนี้เหลือเท่าไหร่</h2>
-    <p class="quiet">เรียงจากเงินที่เหลือมากไปน้อย สีเขียวคือกำไร สีแดงคือขาดทุน เส้นประบนกราฟคือตัวเทียบ</p>
+  <section id="standings" aria-labelledby="summary-title">
+    <div class="section-head">
+      <h2 id="summary-title">ตารางอันดับ</h2>
+      <p class="quiet">เรียงจากเงินที่เหลือมากไปน้อย แถบยาวตามเงิน เส้นตั้งคือเงินเริ่ม 10,000 ดอลลาร์ แถวลายประคือซื้อแล้วถือเฉย ๆ ไว้เทียบ</p>
+    </div>
     <div id="summary-root"></div>
   </section>
 
   <section id="charts" aria-labelledby="charts-title">
-    <h2 id="charts-title">กราฟ</h2>
-    <p class="quiet">เปิดมาให้ดูสามวิธีที่เหลือเงินมากสุด กับเส้นซื้อแล้วถือ ติ๊กเพิ่มได้</p>
+    <div class="section-head">
+      <h2 id="charts-title">กราฟ</h2>
+      <p class="quiet">เปิดมาให้ดูสามวิธีที่เหลือเงินมากสุด กับเส้นซื้อแล้วถือ ติ๊กเพิ่มได้</p>
+    </div>
     <div class="switch" role="group" aria-label="เลือกเหรียญบนกราฟ">
       <button type="button" id="coin-btc" data-asset="BTC" aria-pressed="true">บิตคอยน์</button>
       <button type="button" id="coin-eth" data-asset="ETH" aria-pressed="false">อีเธอเรียม</button>
@@ -57,7 +72,7 @@
 
     <figure>
       <h3 id="equity-title">เงินสมมติ</h3>
-      <p class="quiet">ทุกเส้นเริ่มที่ 10,000 ดอลลาร์ เส้นสีเน้นคือวิธีที่ดีที่สุด เส้นประสีเทาคือซื้อแล้วถือ</p>
+      <p class="quiet">ทุกเส้นเริ่มที่ 10,000 ดอลลาร์ เส้นหนาสีเขียวขี้ม้าคือวิธีที่ดีที่สุด เส้นประสีเทาคือซื้อแล้วถือ</p>
       <div id="legend" class="legend"></div>
       <p><button type="button" id="reset-lines" class="texty">กลับไปดูแค่เส้นหลัก</button></p>
       <div id="equity" class="chart" role="img" aria-labelledby="equity-title"></div>
@@ -68,8 +83,10 @@
   </section>
 
   <section id="trades-section" aria-labelledby="trades-title">
-    <h2 id="trades-title">ซื้อขายล่าสุด</h2>
-    <p class="quiet">เวลาประเทศไทย ผลเป็นกำไรหรือขาดทุนของรอบนั้น</p>
+    <div class="section-head">
+      <h2 id="trades-title">ซื้อขายล่าสุด</h2>
+      <p class="quiet">เวลาประเทศไทย ผลเป็นกำไรหรือขาดทุนของรอบนั้น</p>
+    </div>
     <div id="trades"></div>
   </section>
 
@@ -151,7 +168,7 @@
     <p>นี่คือการจำลองเท่านั้น ไม่มีคำสั่งซื้อขายจริง และไม่ใช้ API key</p>
     <p><a href="#top">กลับขึ้นด้านบน</a></p>
   </footer>
-</div>
+</main>
 <script src="dashboard.js"></script>
 </body>
 </html>
