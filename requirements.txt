@@ -7,3 +7,4 @@ ccxt>=4.4,<5
 quantstats>=0.0.62
 pandas-ta>=0.3.14b
 vectorbt>=0.26
+plotly>=5.18,<6
