@@ -222,3 +222,11 @@ if (counts.total !== 3 || counts.above !== 1 || counts.beatHold !== 1) process.e
         text=True,
     )
     assert completed.returncode == 0, completed.stderr or completed.stdout
+
+
+def test_page_asks_for_fresh_css_and_js_after_a_change():
+    html = (ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+    css = re.search(r'href="dashboard\.css\?v=([\w.-]+)"', html)
+    js = re.search(r'src="dashboard\.js\?v=([\w.-]+)"', html)
+    assert css and js, "both files need a ?v= version so browsers drop the cached copy"
+    assert css.group(1) == js.group(1)
