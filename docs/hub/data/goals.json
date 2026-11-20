@@ -1,0 +1,25 @@
+{
+  "comment": "แก้ไฟล์นี้ได้เลย วันที่ใช้รูปแบบ YYYY-MM-DD ถ้ายังไม่กำหนดให้ใส่ null งานอัตโนมัติจะไม่เขียนทับไฟล์นี้",
+  "goals": [
+    {
+      "id": "ocsc-2570",
+      "title": "ทุน ก.พ. ปริญญาโท-เอก ปี 2570 ปิดรับสมัคร",
+      "date": "2026-12-29",
+      "link": "https://scholar.ocsc.go.th",
+      "note": "วันปิดรับสมัคร"
+    },
+    {
+      "id": "ielts-date",
+      "title": "วันสอบ IELTS (ยังไม่กำหนด)",
+      "date": null,
+      "link": null,
+      "note": "ตั้งวันสอบ"
+    }
+  ],
+  "checklist": [
+    { "id": "reading", "label": "Reading" },
+    { "id": "listening", "label": "Listening" },
+    { "id": "writing", "label": "Writing" },
+    { "id": "speaking", "label": "Speaking" }
+  ]
+}
