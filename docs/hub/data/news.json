@@ -1,0 +1,120 @@
+{
+  "ok": true,
+  "topics": {
+    "spacex": {
+      "id": "spacex",
+      "title_th": "SpaceX",
+      "ticker": "SPCX",
+      "items": [
+        {
+          "title": "Jim Cramer Flags 'Real Battle' for SpaceX With Nvidia as Anthropic, Google Spend Billions on Compute: 'I",
+          "source": "Benzinga",
+          "time": "2026-11-20T07:06:13Z",
+          "link": "https://news.google.com/rss/articles/CBMigwJBVV95cUxOWmwyQk4tT3B3V09vdkJZdHhoRS04ZmVNcWotN3VpbDJDcVk1ajQtMTM0UF9WbGpENXJ0Q21MMWpZMlBlV1hxdV9DTHFJMjNpSzJoLUZNMWFrOGsycEtudHZlQ2hQQ01GZVdNVkpITTJjbnlaMW83Ty13VUNZdGx4ZlpESDYwZlVFMk9YUzNLN0g1QkJraXVsZjA5aUZMTlFLbTVkTGRmR0NLM3g0U05QUkZuajNIT3Y4SGZBSE04LThuYUhsY1dmX01GSTlZS3hhTHl0N3hSZWxvbjBBSm9wWFBTVmtDNE52OUU2cThadHF2dks3cDJ5a1ppZXlYWG5QNXRZ?oc=5"
+        },
+        {
+          "title": "Elon Musk’s Dream Meets Wall Street Reality: SpaceX Lenders Don’t Want Nvidia Chips Leaving Earth",
+          "source": "Benzinga",
+          "time": "2026-11-20T06:24:33Z",
+          "link": "https://news.google.com/rss/articles/CBMi4AFBVV95cUxOSmlNMXFCMHNRUklLa0dqUmwzbTBzSXprcjJGMkxPMzlfWTNIUWdvUXdDVUVJMEF6TV9RbzZ5QzZwLV9BY1g2NFdCQ0FBQUlrUWI1cjR1cFRFOS1uVEdvMV9rYW1LWGVmSGxHVExrbDRtSm9aaTV2dlNNV2p2WGZlM1E1eVBFbzBKR3RveXVGekxsTnNWRXZ4NVhZN2g5bGZ5dm0td2NPZktnaXg1ejJBbi1LTDBPZ09nQkk4Q1lUWDMyazBvQmlUbmRQMjFfMWxVZFhmZDVCVUFldk5WTEdBQQ?oc=5"
+        },
+        {
+          "title": "Could Tesla Become The Next Lumentum? Gary Black Warns A SpaceX Stock Deal Could Send TSLA Down 25%",
+          "source": "Yahoo Finance",
+          "time": "2026-11-20T06:15:00Z",
+          "link": "https://news.google.com/rss/articles/CBMingFBVV95cUxQUjdxZmgyRFR3LWVXYU9OUEdXdzBac3B4ZjNzNVg3SG1Qd3BsQXhWMmZOT3lFaTVIZDFUWFNNeDdKUE9sR3Y4aXlGbGJGSEpkZ0Q2VXdQTklmVHg5MFFBcy1zc0VHbzBrSnM0Z19KOUdKNXJjV0Q2VmJhUXJKdnBxYm5qZVdLZmtnY0J2RlloVjlwUHUyd182c0Z0aXR0QQ?oc=5"
+        },
+        {
+          "title": "Texas Officials Reject SpaceX Tax Break for Elon Musk's $24 Billion Project",
+          "source": "Law Commentary",
+          "time": "2026-11-20T05:46:42Z",
+          "link": "https://news.google.com/rss/articles/CBMimAFBVV95cUxNQXZnRFFNSjRkc2wxTVNOMkxObGM3SVJSeW5nLXNHWEo1UktJN0tCZ0JkUGdRemd1Mnk2TjFVYzY0YWJhV3lXYld3ZldDd1A3SHl3LTQ4UFBLR3lDZmZsMWdHbFVQZ1dQVWU5U1ZxeHVndWtWbGR3bXQxSFIzYWd2WEJidk5Ibmtpd00wb0gwVFZ0aTBjWC03Sw?oc=5"
+        },
+        {
+          "title": "AG Mayes urges delay on SpaceX project",
+          "source": "12News",
+          "time": "2026-11-20T05:13:00Z",
+          "link": "https://news.google.com/rss/articles/CBMixAFBVV95cUxONGZZQ0tjc2NnQ3htSjNrcnBvRDBFYTRfNWR5UnlobVZaX2NrX1VjOUdHckFzUEh1ZWVBeHJ0R2ZOTU5DMlpVTE9iWklVd29UWVp0TmlyTUlMZHZ1VklubkdUblZ5R0FOSlB6WGc3Y3p0U2Y3VU8xNWNad28tNUhzOG5OelBGR0R1YXdLcEVQcndORGRXMnlzTGlpVmcxMzU2enBidTVnUU1PZWJjZm15bmlOc3Y2c3FvSWxOWksxbjY3N2NV?oc=5"
+        }
+      ],
+      "error": null
+    },
+    "pltr": {
+      "id": "pltr",
+      "title_th": "Palantir",
+      "ticker": "PLTR",
+      "items": [
+        {
+          "title": "Months before, Anthropic's record IPO, Palantir’s Alex Karp 'blamed' AI labs of drug addicting everyone b",
+          "source": "The Times of India",
+          "time": "2026-11-20T06:11:00Z",
+          "link": "https://news.google.com/rss/articles/CBMikgJBVV95cUxOS2MzbnlOa0JDenNYa3YtSk9SX2tpNklmTVgwekZoRnNyRG9xQ3kzZ2hDUnJ2Y3pCb01oUjAyZERUZVZEOXR6WFRRZ2NDWTB5LTh3QXBMX3ozQUZkN0N3SmZsQ2JRR0t0dFNURkFrMi1fRGFzYmlRclRFYzRyaGJoOEg0eTNDU3lqbFFJV0F4QjFSOG1hR282NWtzeHBYWE5TNk5WUGlaNFl5WGZ1WVlMbHhRMWhNTWE4MUYtNmlqWEJHSDcxQU9WaUlqY09rUVItaE5nR1daelN1bVY3cENqOGJTbEgzMXB6SjRtbENtTTBlaWxFOGZJTy1oM0sxWG9HSGJwWXM3TlY2Z0RQYTF1QmNR0gGXAkFVX3lxTFA2VkJBUmZaZGxWQmxYeFRfWXJZZ0V2VFJ2RHZwY196MUtmVmlRdDZzUklKRTRLNGxDdGZyY29Xd0ZTQm5RS0tpTFQtMnRuZmRmTTJ2M2VWMDNhaU9HLUNTWk9IMUs3NTBqVy1WalJPWmtfMFZSZ1hhbWp3WHVwNXRwWU1PdzNZUlhOZ05yUFJ1RXNCc0wzZkIyX0Zvc2ZGNXd6MlhidzVEcXFxS1JYOERnbUxrU3FDdFZNcFNoNENtZXV1M0htWHl2Sm10SklBVkgteng1bUYxYklCYU1yQnVudUJlUHhfWHJ6TE5ITThGSDhnSzYzMDVnUGdkRlZZOG5RVWNnbmNDZ0hnOE5sVXJuU29ab0R6Yw?oc=5"
+        },
+        {
+          "title": "U.S. Prosecutors Charge Russian Man With Stalking Palantir Staff for Moscow Spy Plot",
+          "source": "The SOFX Report",
+          "time": "2026-11-20T04:08:11Z",
+          "link": "https://news.google.com/rss/articles/CBMiqAFBVV95cUxPZWY1V0tHMDJZS3dxQ2lydjRhcFpHaWNnSzlpeERzSUc2OVhIWjhMUGYySEk1dFJaamFEYXZiZ2t3eWs2YlNWNVJHaEpjNTRSUXJxUXNCNkxUMGVPZWFNaUVhdW9iS3NDTVljdGo3NGdZNEtxNEM5NVF0SzdkRFctcjFmN0haVGpUcXpnYmVERXhiNWwydXowTV9TQkxVQkpYVU94SzY3R0g?oc=5"
+        },
+        {
+          "title": "Silicon Valley Defense Tech Infiltration Case: Russian National Charged for Allegedly Lying in Wait to Surveil Palantir Employees",
+          "source": "BigGo Finance",
+          "time": "2026-11-20T02:45:00Z",
+          "link": "https://news.google.com/rss/articles/CBMidkFVX3lxTE9ubUI5amZHaWVVZlFjbDVwUmROT2JmNVhWRkxWUU1KYnEtZm5zR3NuOWx4Q2NVRE9kSEVDbE9UWkVUSDJQUEtySU9HYzBmaUtDWnVUY1gwSXVWMlMzN3IyMGFTX3hlWGw2enBMY1ZCTkVYWTJyOFE?oc=5"
+        },
+        {
+          "title": "Trump bought Nvidia, Palantir, SpaceX in September amid rise in federal contracts and White House contacts",
+          "source": "디지털투데이",
+          "time": "2026-11-20T02:10:17Z",
+          "link": "https://news.google.com/rss/articles/CBMi5AFBVV95cUxPZHZja0JzdFl0Mm9nWk4wdDEwSHBkVmNlNERtakVjSWRPQTVQSTdicEN2cVpRbk5UWnNmOXl5czRuLWhIaTBtX1RFeU50RU5qOW9zOF8wcVJmQmdscUZqc0JjUUp4QkV3RExmM2pmSGEyZnJZY3kxOGJBTXVpb05ZVHNoN1lHNlNXQ0M1dGlQNTNiVEJUTU1lVlZnRGhaazZ6N3lqMlNBSGFkWEpwcnhUWVl1SHJKUVpDLXNtNVhoTTN2NW14SVB4dmxjN3NmaTZEY2FyMWg2d2hqNTVzY1lWLVJFaHQ?oc=5"
+        },
+        {
+          "title": "Who is Michael LoSapio? Trump's CISA pick from Palantir says Jan. 6 was not an attack",
+          "source": "Nacionale",
+          "time": "2026-11-19T23:26:06Z",
+          "link": "https://news.google.com/rss/articles/CBMirwFBVV95cUxPUVFkU0UtWVpXYTc5b2VodzFGUmhpeWN2M1FmSTh5c2xtZFNab3dmWV93MDczbkM0eEl6cTlLVlpvZUhLVm50bGVHQm1GY3V5VEpyYzNKLXFCSXVaWjMzcV9qUGZnTjJKMGpqTEF0V1V3MWxKNW5WOEI0Y3djT0xQQ1R4dEZseU1TaXprdzBjUkhPSXdFdjAyNDU1VlZjeU5WWnBxUjNlTm9zMGpldjNR?oc=5"
+        }
+      ],
+      "error": null
+    },
+    "macro": {
+      "id": "macro",
+      "title_th": "เศรษฐกิจมหภาค",
+      "ticker": "MACRO",
+      "items": [
+        {
+          "title": "RBA Seeks to Manage Inflation, Jobs Tradeoffs, Board Member Says",
+          "source": "Bloomberg.com",
+          "time": "2026-11-20T05:59:20Z",
+          "link": "https://news.google.com/rss/articles/CBMiswFBVV95cUxOQnhrbGhFcDBkUG5teTFYdVFqcGhZRm9HckFtWmJ4MF9UN0hFdjZSS19WaHQwYlplNEQ4Z2Eya18xZE90YjVWVHFobmRiNnpqRG9ZSVlfQUF3alZpbWlzUFlTOGZnd21tcGprcUs0WHhETlYwOHUxR19sbzJvOFRTU0EzeFM3ejRRTzBrY2I2azVKYktFLVJXRjEwUmgwNExiVFlDXzhsbHU1ZDYyWDBIclF1Zw?oc=5"
+        },
+        {
+          "title": "Japan's core inflation accelerates to 2.2% in October",
+          "source": "Anadolu Ajansı",
+          "time": "2026-11-20T05:50:13Z",
+          "link": "https://news.google.com/rss/articles/CBMilgFBVV95cUxNV21oTGIxMmhkaXVsaXQtV2k3NXJHZllCQ2dXeWpIR1U0eXVIX0JSdkd2bGJjVTE3by1fN2tOcmlVSlFHN2ZDMkRzVGZQNE9oalBQbzlDZlRKTk50Y0U4aHhidHAyWk9tdVE1X2dmbVNZcEtUdTVNNkRua19FbzdiZHpnamp6VEFsY2hueDZHRXVMT0dPWEE?oc=5"
+        },
+        {
+          "title": "UCLA’s meal swipe value isn’t catching up to inflation. Students deserve better",
+          "source": "Daily Bruin",
+          "time": "2026-11-20T05:32:00Z",
+          "link": "https://news.google.com/rss/articles/CBMirwFBVV95cUxNQ2dGX1pUOElrdjlKMVJKLTB0X1lZcl9OQ1lKa1VqYkVzZXhtUV8wWGN2ckRrVEo5QUxuSDBtb1dWVDFSaWJXRlM1QUNVLTc0djZBLWZtalRCN0tZcFFHZ2d4YWhvN0EtbHpXcHU3ODZCVG16bldDeS1FaEw1OGZqdDZ2OU5VeV93eGUwOXdXSkMwYTJUQTNsMEw5ZEVOeFpwMEFZc2h4cTBPdjNpdDE0?oc=5"
+        },
+        {
+          "title": "Peru's inflation reaches a 38-month high as fuel prices surge and El Niño threatens food supplies",
+          "source": "Latin Times",
+          "time": "2026-11-20T05:23:00Z",
+          "link": "https://news.google.com/rss/articles/CBMihgFBVV95cUxNZkIwUFFYb0VxWDB3T2diVjFsS2ZrUHdWTEpwTzZNTG5YYVp3QjdyM0dQazNSa3pEMTdwMWl4Z2NrSUE2TVdyLVNzNE5yUTB3bl9keGY3YzZ1Z1hfeWNxWXR5Y2xIaXIycTh3NkZscEtkZ24yNXBKbFgzOEVHZHRISlpYRmZrQQ?oc=5"
+        },
+        {
+          "title": "Japan's October core CPI rises to 2.2%, misses estimates, and headline inflation hits 11-month high",
+          "source": "TradingView",
+          "time": "2026-11-20T05:11:51Z",
+          "link": "https://news.google.com/rss/articles/CBMi8AFBVV95cUxNbDNRZlZRTHN6Q25UZE1QX1U2cWhhS0F2THdRTDhKV2JZN2hxTHZYUmRjR2dWdjNtUi1OeGtQM3dnSFRLNmh3RXpwWXZUSUdpazJIQjU3MXV1d1RLMEN2TGNXX1ZNX3R3MHRHeU1CSnJFNDlxTWFtb291S0tRa2Jyd09JbUJHRzZfdFRsR1p5SEE1MjRIaUgxd203UHZCWUhVdEM1V2tiNDdfRVExbTE1aVJyaHFOZDNVeWl0ZVNFbzZJbTRCOW81blNXbFJBNFctYmlkMHZaQVJLVk1OdlAtbmFzY0FSNldYZXdqdmhOZXk?oc=5"
+        }
+      ],
+      "error": null
+    }
+  },
+  "fetched_at": "2026-11-20T14:15+07:00"
+}
