@@ -72,6 +72,35 @@ def test_choose_params_scores_the_recent_train_window_not_the_whole_past():
     assert seen == [120, 120]
 
 
+def test_cash_yield_does_not_retune_walk_forward_or_pay_the_benchmark():
+    strategy, _calls = _spy_strategy()
+    bars = _bars(200)
+    plain = walk_forward(bars, strategy, train_days=100, test_days=50)
+    strategy_again, _calls_again = _spy_strategy()
+    rich = walk_forward(bars, strategy_again, train_days=100, test_days=50, cash_annual_yield=0.04)
+    assert [fold["params"] for fold in rich.folds] == [fold["params"] for fold in plain.folds]
+    pd.testing.assert_series_equal(rich.benchmark.equity, plain.benchmark.equity)
+    # The chosen rule is long, so only the cash day before the first fill earns yield.
+    assert rich.result.final_cash == 0.0
+    assert rich.result.equity.iloc[-1] > plain.result.equity.iloc[-1]
+
+
+def test_backtest_window_applies_yield_only_to_the_strategy():
+    from crypto_lab.research import backtest_window
+
+    strategy, _calls = _spy_strategy()
+    bars = _bars(30)
+    zero, bench_zero = backtest_window(bars, strategy, {"mode": "flat"}, 0, len(bars), cash_annual_yield=0.0)
+    rich, bench_rich = backtest_window(bars, strategy, {"mode": "flat"}, 0, len(bars), cash_annual_yield=0.04)
+    pd.testing.assert_series_equal(bench_zero.equity, bench_rich.equity)
+    assert rich.equity.iloc[-1] > zero.equity.iloc[-1]
+    assert rich.final_units == 0.0
+    long, _bench = backtest_window(bars, strategy, {"mode": "long"}, 0, len(bars), cash_annual_yield=0.04)
+    assert long.final_cash == 0.0
+    assert long.held[0] == 0.0
+    assert long.held[-1] == 1.0
+
+
 def test_dca_deploys_equal_slices_then_holds():
     bars = _bars(30, start=100)
     # Force a flat price so fees are the only drag.
