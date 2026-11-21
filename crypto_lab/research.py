@@ -6,6 +6,7 @@ import json
 import re
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from crypto_lab.assumptions import BARS_PER_DAY, FEE_RATE, IN_SAMPLE_FRACTION, SLIPPAGE_RATE, WALK_FORWARD_TEST_DAYS, WALK_FORWARD_TRAIN_DAYS
@@ -48,8 +49,22 @@ def split_point(n_rows: int, fraction: float = IN_SAMPLE_FRACTION) -> int:
     return min(max(cut, 1), n_rows - 1)
 
 
-def backtest_window(bars, strategy, params, start: int, end: int, fee_rate: float = FEE_RATE, step_bars: int | None = None):
-    """Test bars[start:end]. Signal strategies may read prices before `start`."""
+def backtest_window(
+    bars,
+    strategy,
+    params,
+    start: int,
+    end: int,
+    fee_rate: float = FEE_RATE,
+    step_bars: int | None = None,
+    cash_annual_yield: float = 0.0,
+):
+    """Test bars[start:end]. Signal strategies may read prices before `start`.
+
+    cash_annual_yield is opt-in and applies only to the strategy. The
+    buy-and-hold benchmark stays at 0% because it is in the coin after the
+    first fill. The default is 0% so the published tables do not change.
+    """
     from crypto_lab.engine import run_dca
 
     window = bars.iloc[start:end]
@@ -68,6 +83,7 @@ def backtest_window(bars, strategy, params, start: int, end: int, fee_rate: floa
             signal,
             fee_rate=fee_rate,
             slippage_rate=SLIPPAGE_RATE,
+            cash_annual_yield=cash_annual_yield,
         )
     benchmark = run_backtest(
         window,
@@ -347,3 +363,98 @@ def persist_summary(frame: pd.DataFrame, folds: pd.DataFrame | None = None) -> N
         for row in winners.itertuples(index=False):
             print(f"  {row.asset} {row.strategy}: {_pct(row.total_return)} เทียบกับ {_pct(row.bh_total_return)}")
     print(f"บันทึกตารางที่ {RESULTS / 'summary.md'}")
+
+
+# Experiment 14 only. This is an assumption, not a rate from any calendar year,
+# and it is not the default used by the tables above.
+ASSUMED_CASH_ANNUAL_YIELD = 0.04
+
+
+def _metric_blob(result) -> dict:
+    metrics = result.metrics
+    return {
+        "total_return": metrics["total_return"],
+        "max_drawdown": metrics["max_drawdown"],
+        "win_rate": metrics["win_rate"],
+        "n_trades": int(metrics["n_trades"]),
+    }
+
+
+def cash_yield_sma_filter(
+    assets: dict[str, pd.DataFrame],
+    annual_yield: float = ASSUMED_CASH_ANNUAL_YIELD,
+) -> dict:
+    """Daily 200-day filter with an opt-in cash yield, against buy-and-hold.
+
+    The full sample and the last 30% use window 200 and nothing else. Walk-forward
+    keeps the windows choose_params already picks at 0% cash. The yield is not
+    passed into that search, and buy-and-hold is always run at 0%.
+    """
+    strategy = next(item for item in STRATEGIES if item.id == "sma_filter")
+    locked = {"window": 200}
+    report = {"annual_yield": annual_yield, "assets": {}}
+    for asset, bars in assets.items():
+        cut = split_point(len(bars))
+        periods = {}
+        for name, start, end in (
+            ("full", 0, len(bars)),
+            ("oos", cut, len(bars)),
+        ):
+            zero, bench = backtest_window(bars, strategy, locked, start, end, cash_annual_yield=0.0)
+            rich, bench_again = backtest_window(
+                bars, strategy, locked, start, end, cash_annual_yield=annual_yield
+            )
+            if not bench.equity.equals(bench_again.equity):
+                raise RuntimeError(f"{asset} {name}: buy-and-hold changed when the cash yield changed")
+            periods[name] = {
+                "start": zero.equity.index[0].date().isoformat(),
+                "end": zero.equity.index[-1].date().isoformat(),
+                "zero": _metric_blob(zero),
+                "yield": _metric_blob(rich),
+                "buy_hold": _metric_blob(bench),
+            }
+        plain = walk_forward(bars, strategy)
+        rich_wf = walk_forward(bars, strategy, cash_annual_yield=annual_yield)
+        if [fold["params"] for fold in plain.folds] != [fold["params"] for fold in rich_wf.folds]:
+            raise RuntimeError(f"{asset}: cash yield changed a walk-forward window")
+        if not plain.benchmark.equity.equals(rich_wf.benchmark.equity):
+            raise RuntimeError(f"{asset}: walk-forward buy-and-hold earned cash yield")
+        folds = []
+        for number, fold in enumerate(plain.folds, start=1):
+            start = bars.index.get_loc(pd.Timestamp(fold["test_start"]))
+            end = bars.index.get_loc(pd.Timestamp(fold["test_end"])) + 1
+            if not isinstance(start, (int, np.integer)) or not isinstance(end, (int, np.integer)):
+                raise RuntimeError(f"{asset} fold {number}: test dates are not unique")
+            zero, bench = backtest_window(
+                bars, strategy, fold["params"], int(start), int(end), cash_annual_yield=0.0
+            )
+            rich, _bench_again = backtest_window(
+                bars, strategy, fold["params"], int(start), int(end), cash_annual_yield=annual_yield
+            )
+            folds.append(
+                {
+                    "fold": number,
+                    "test_start": pd.Timestamp(fold["test_start"]).date().isoformat(),
+                    "test_end": pd.Timestamp(fold["test_end"]).date().isoformat(),
+                    "params": dict(fold["params"]),
+                    "zero": _metric_blob(zero),
+                    "yield": _metric_blob(rich),
+                    "buy_hold": _metric_blob(bench),
+                }
+            )
+        periods["walk_forward"] = {
+            "start": plain.result.equity.index[0].date().isoformat(),
+            "end": plain.result.equity.index[-1].date().isoformat(),
+            "zero": _metric_blob(plain.result),
+            "yield": _metric_blob(rich_wf.result),
+            "buy_hold": _metric_blob(plain.benchmark),
+        }
+        report["assets"][asset] = {
+            "n_bars": len(bars),
+            "first": bars.index[0].date().isoformat(),
+            "last": bars.index[-1].date().isoformat(),
+            "oos_start": bars.index[cut].date().isoformat(),
+            "periods": periods,
+            "folds": folds,
+        }
+    return report

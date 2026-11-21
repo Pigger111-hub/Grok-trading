@@ -105,6 +105,7 @@ def walk_forward(
     strategy,
     train_days: int = WALK_FORWARD_TRAIN_DAYS,
     test_days: int = WALK_FORWARD_TEST_DAYS,
+    cash_annual_yield: float = 0.0,
 ) -> WalkForwardResult:
     if strategy.kind == "dca":
         return _walk_forward_dca(bars, strategy, train_days, test_days)
@@ -116,6 +117,9 @@ def walk_forward(
         params, score = choose_params(bars.iloc[:test_start], strategy, train_days)
         # Prices after test_end are not passed in. Causal indicators make each
         # day inside the window independent of later days in the same window.
+        # Parameter choice stays on the zero-yield backtest inside choose_params.
+        # cash_annual_yield is applied only when this stitched signal is traded,
+        # so a cash-yield assumption cannot pick a different window.
         signal = strategy.generate(bars.iloc[:test_end], **params)
         stitched.iloc[test_start:test_end] = signal.iloc[test_start:test_end].to_numpy()
         folds.append(
@@ -131,6 +135,8 @@ def walk_forward(
         raise RuntimeError(f"{strategy.id}: walk-forward produced no test days")
     start_ts = stitched.first_valid_index()
     window = bars.loc[start_ts:]
-    result = run_backtest(window, stitched.loc[start_ts:])
+    result = run_backtest(window, stitched.loc[start_ts:], cash_annual_yield=cash_annual_yield)
+    # Buy-and-hold is invested after its first fill, and this benchmark is the
+    # no-interest comparison even when the strategy opts into a cash yield.
     benchmark = run_backtest(window, pd.Series(1.0, index=window.index))
     return WalkForwardResult(result=result, benchmark=benchmark, folds=folds, signal=stitched)
