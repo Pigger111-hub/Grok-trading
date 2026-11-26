@@ -156,6 +156,8 @@ a:hover { text-decoration-thickness: 2px; }
 .band :focus-visible { outline-color: var(--on-brand); }
 
 .band-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 12px; }
+.band-id { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.band-id a { color: var(--on-brand-quiet); font-size: var(--text-sm); }
 .brand { font-weight: 700; font-size: var(--text-md); letter-spacing: 0.02em; }
 .disclaimer-pill {
   font-size: var(--text-xs); font-weight: 500;

@@ -1,0 +1,40 @@
+name: hub data
+
+on:
+  schedule:
+    # 07:30 Asia/Bangkok. FRED's daily rate is usually in by then.
+    # The paper-dashboard workflow is unchanged and still owns the trading book.
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hub-data
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch macro series and headlines
+        run: python scripts/fetch_hub_data.py
+      - name: Commit hub data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/hub/data/macro.json docs/hub/data/news.json
+          if git diff --staged --quiet; then
+            echo "No change to commit"
+          else
+            git commit -m "Update hub macro and news"
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            git push
+          fi
