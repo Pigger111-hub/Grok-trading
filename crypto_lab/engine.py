@@ -6,17 +6,18 @@ Timing rule (this is what stops look-ahead bias):
   * If the signal is on the last row, there is no next open, so it does not trade.
 
 Long only, no leverage, no shorting. 1 means "be fully invested". 0 or a missing
-value means "be in cash". Cash earns 0%. A position still open at the end is
-marked at the last close and is not charged an exit fee, because the coins
-were not sold.
+value means "be in cash". Cash earns 0% unless the caller passes
+cash_annual_yield. A position still open at the end is marked at the last close
+and is not charged an exit fee, because the coins were not sold.
 """
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 
-from crypto_lab.assumptions import FEE_RATE, INITIAL_CASH, SLIPPAGE_RATE
+from crypto_lab.assumptions import CASH_ANNUAL_YIELD, FEE_RATE, INITIAL_CASH, PERIODS_PER_YEAR, SLIPPAGE_RATE
 from crypto_lab.metrics import compute_metrics
 from crypto_lab.timeframes import weekly_step_bars
 
@@ -31,15 +32,45 @@ class BacktestResult:
     final_units: float = 0.0
 
 
+def cash_growth_factor(annual_yield: float, elapsed_days: float) -> float:
+    """Compound `annual_yield` across `elapsed_days` of a 365-day year.
+
+    The rate is an assumption the caller already chose. It is not estimated
+    from prices. `elapsed_days` must be known when the bar opens: one day for
+    the first bar, and the gap since the previous bar after that.
+    """
+    if elapsed_days <= 0.0 or annual_yield == 0.0:
+        return 1.0
+    return (1.0 + annual_yield) ** (elapsed_days / PERIODS_PER_YEAR)
+
+
+def _elapsed_days(index) -> np.ndarray:
+    """Days of cash yield each bar may earn, without reading prices or the future.
+
+    Bar 0 counts as one day. Bar i uses index[i] - index[i - 1], which is known
+    at that bar's open. A later bar's date cannot change an earlier factor.
+    """
+    n = len(index)
+    elapsed = np.ones(n, dtype=float)
+    if n <= 1:
+        return elapsed
+    delta = pd.Series(pd.DatetimeIndex(index)).diff().iloc[1:]
+    elapsed[1:] = delta.dt.total_seconds().to_numpy(dtype=float) / 86400.0
+    return elapsed
+
+
 def run_backtest(
     bars: pd.DataFrame,
     signal: pd.Series,
     initial_cash: float = INITIAL_CASH,
     fee_rate: float = FEE_RATE,
     slippage_rate: float = SLIPPAGE_RATE,
+    cash_annual_yield: float = CASH_ANNUAL_YIELD,
 ) -> BacktestResult:
     if not isinstance(bars.index, pd.DatetimeIndex):
         raise TypeError("bars must be indexed by date")
+    if not math.isfinite(cash_annual_yield) or cash_annual_yield <= -1.0:
+        raise ValueError("cash_annual_yield must be finite and greater than -100%")
     sig = pd.Series(signal, index=getattr(signal, "index", None)).reindex(bars.index)
     sig_values = sig.to_numpy(dtype=float)
     opens = bars["open"].to_numpy(dtype=float)
@@ -52,6 +83,7 @@ def run_backtest(
     trades: list[dict] = []
     open_trade = None
     dates = bars.index
+    elapsed_days = _elapsed_days(dates) if cash_annual_yield != 0.0 else None
 
     for i in range(n):
         if i > 0 and not np.isnan(sig_values[i - 1]):
@@ -83,6 +115,12 @@ def run_backtest(
                 )
                 units = 0.0
                 open_trade = None
+        # Yield follows the position after today's open fill. That fill used
+        # yesterday's signal, so today's close cannot turn the yield on or off.
+        # A long day has no cash, so it earns nothing. The trade's own return
+        # was recorded at the fill, before this accrual.
+        if elapsed_days is not None and units == 0.0 and cash > 0.0:
+            cash *= cash_growth_factor(cash_annual_yield, float(elapsed_days[i]))
         equity[i] = cash + units * closes[i]
         held[i] = 1.0 if units > 0 else 0.0
 
