@@ -85,6 +85,8 @@ def run_sweep_and_sheets(
     folder = ROOT / "docs" / "tearsheets"
     for asset, bars in assets.items():
         for spec in PAPER_BOOK:
+            if spec.get("kind") == "weight" and timeframe != "1d":
+                continue
             print(f"รายงาน QuantStats {asset} {spec['id']} ...")
             try:
                 write_strategy_tearsheet(bars, asset, spec["id"], spec["params"], folder, timeframe=timeframe)

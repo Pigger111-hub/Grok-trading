@@ -14,8 +14,16 @@ SLIPPAGE_RATE = 0.0005
 INITIAL_CASH = 10_000.0
 
 # Crypto trades every day, including weekends, so a year has 365 days here
-# (stock research often uses 252). The risk-free rate is 0: cash earns nothing.
+# (stock research often uses 252). Cash earns nothing unless a backtest opts in
+# by passing cash_annual_yield. Any non-zero rate is an assumption for that
+# run, not a rate observed in a particular year.
 PERIODS_PER_YEAR = 365
+CASH_ANNUAL_YIELD = 0.0
+
+# Paper book only. Research tables stay at CASH_ANNUAL_YIELD unless a caller
+# opts in. This 4% is an assumption on cash actually held. It is not interest
+# paid by a bank or an exchange. Buy-and-hold does not use it.
+PAPER_CASH_ANNUAL_YIELD = 0.04
 
 # First 70% of each coin's history is the "in-sample" period. The last 30%
 # is "out-of-sample": we look at it only after the rules are already chosen.

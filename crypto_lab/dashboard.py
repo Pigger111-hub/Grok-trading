@@ -16,6 +16,8 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from crypto_lab.assumptions import PAPER_CASH_ANNUAL_YIELD
+
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 
@@ -23,6 +25,7 @@ COLORS = {
     "sma_filter": "#3dff9a",
     "macd": "#4cc9ff",
     "donchian": "#ff4fd8",
+    "trend_vol": "#7aa2ff",
     "buy_and_hold": "#9aa4b2",
 }
 
@@ -30,12 +33,19 @@ NAMES_TH = {
     "sma_filter": "เส้น 200 วัน (200-day SMA)",
     "macd": "MACD 12/26/9",
     "donchian": "ดอนเชียน 20/10 (Donchian)",
+    "trend_vol": "คะแนนเทรนด์ + เป้า 40% (เงินสมมติ)",
     "buy_and_hold": "ซื้อแล้วถือ (buy and hold)",
     "sma_cross": "เส้น 50/200 (SMA cross)",
     "rsi": "RSI 14",
     "bollinger": "โบลลินเจอร์ (Bollinger)",
     "dca_weekly": "ทยอยซื้อ 52 สัปดาห์ (DCA)",
 }
+
+
+def cash_yield_note() -> str:
+    """Thai label for the paper book's assumed cash yield. Not a bank rate."""
+    percent = int(round(PAPER_CASH_ANNUAL_YIELD * 100))
+    return f"ดอกเบี้ยสมมติ {percent}% ต่อปีบนเงินสดที่ถืออยู่จริง ไม่ใช่ดอกเบี้ยจริง"
 
 
 def _bangkok_now() -> str:
@@ -164,7 +174,15 @@ def build_payload(conn: sqlite3.Connection, prices: dict[str, pd.DataFrame]) -> 
     positions = _records(conn, "SELECT * FROM paper_positions ORDER BY asset, strategy")
     for position in positions:
         position["name_th"] = NAMES_TH.get(position["strategy"], position["strategy"])
-        position["side_th"] = "ถือเหรียญ" if position["side"] == "long" else "เงินสด"
+        market = float(position["market_value"] or 0.0)
+        account = float(position["cash"] or 0.0) + market
+        position["weight"] = (market / account) if account else 0.0
+        if position["side"] == "partial":
+            position["side_th"] = "ถือบางส่วน"
+        elif position["side"] == "long":
+            position["side_th"] = "ถือเหรียญ"
+        else:
+            position["side_th"] = "เงินสด"
     trades = _records(
         conn,
         """
@@ -182,6 +200,7 @@ def build_payload(conn: sqlite3.Connection, prices: dict[str, pd.DataFrame]) -> 
         "updated_bangkok": _bangkok_now(),
         "price_as_of": as_of["value"] if as_of else None,
         "disclaimer": "นี่คือการจำลองเท่านั้น ไม่มีคำสั่งซื้อขายจริง และไม่ใช้ API key",
+        "cash_yield_note": cash_yield_note(),
         "candles": candles,
         "markers": markers,
         "equity": equity,
