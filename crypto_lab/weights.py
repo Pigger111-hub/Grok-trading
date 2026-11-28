@@ -12,7 +12,7 @@ Timing is the same as the main engine: a weight on today's row may use today's
 close, and the order is filled at the NEXT bar's open.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -80,6 +80,12 @@ class WeightResult:
     metrics: dict
     n_rebalances: int
     turnover: float  # total traded amount / starting cash
+    # One trade is a round trip: leaving cash, then returning to cash.
+    # A resize that stays invested is part of that trip, not a new trade.
+    # An open trip at the last bar is included and marked, same as the all-in engine.
+    trades: list = field(default_factory=list)
+    final_cash: float = 0.0
+    final_units: float = 0.0
 
 
 def run_weight_backtest(
@@ -109,6 +115,9 @@ def run_weight_backtest(
     held = np.zeros(n)
     rebalances = 0
     traded = 0.0
+    trades: list[dict] = []
+    episode = None
+    dates = bars.index
 
     for i in range(n):
         if i > 0 and not np.isnan(target[i - 1]) and opens[i] > 0:
@@ -118,6 +127,7 @@ def run_weight_backtest(
             gap = want - have
             must_exit = want == 0.0 and units > 0
             if abs(gap) >= band or must_exit:
+                was_flat = units <= 0.0
                 if gap > 0:
                     spend = min(gap * account, cash)
                     units += spend * (1.0 - fee_rate) / (opens[i] * (1.0 + slippage_rate))
@@ -129,8 +139,41 @@ def run_weight_backtest(
                     units -= sell_units
                     traded += sell_units * opens[i]
                 rebalances += 1
+                if was_flat and units > 0.0:
+                    episode = {
+                        "entry_date": dates[i],
+                        "entry_price": float(opens[i] * (1.0 + slippage_rate)),
+                        "equity_at_entry": float(account),
+                    }
+                elif episode is not None and units <= 0.0:
+                    base = episode["equity_at_entry"]
+                    trades.append(
+                        {
+                            "entry_date": episode["entry_date"],
+                            "exit_date": dates[i],
+                            "entry_price": episode["entry_price"],
+                            "exit_price": float(opens[i] * (1.0 - slippage_rate)),
+                            "return": (cash / base - 1.0) if base else None,
+                            "closed": True,
+                        }
+                    )
+                    episode = None
         equity[i] = cash + units * closes[i]
         held[i] = units * closes[i] / equity[i] if equity[i] > 0 else 0.0
+
+    if episode is not None:
+        marked = cash + units * float(closes[-1])
+        base = episode["equity_at_entry"]
+        trades.append(
+            {
+                "entry_date": episode["entry_date"],
+                "exit_date": dates[-1],
+                "entry_price": episode["entry_price"],
+                "exit_price": float(closes[-1]),
+                "return": (marked / base - 1.0) if base else None,
+                "closed": False,
+            }
+        )
 
     equity_s = pd.Series(equity, index=bars.index, name="equity")
     metrics = compute_metrics(equity_s, [], held, periods_per_year=periods_per_year)
@@ -143,4 +186,21 @@ def run_weight_backtest(
         metrics=metrics,
         n_rebalances=rebalances,
         turnover=traded / float(initial_cash),
+        trades=trades,
+        final_cash=cash,
+        final_units=units,
     )
+
+
+def round_trip_stats(trades: list) -> dict:
+    """Win rate of round trips. A resize that never returns to cash is not its own trade.
+
+    The open trip at the end counts, marked at the last close with no exit fee.
+    `n_rebalances` on the result is the separate count of band crossings.
+    """
+    counted = [trade for trade in trades if trade.get("return") is not None]
+    wins = sum(1 for trade in counted if trade["return"] > 0)
+    return {
+        "n_trades": len(counted),
+        "win_rate": (wins / len(counted)) if counted else float("nan"),
+    }

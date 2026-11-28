@@ -74,6 +74,56 @@ def test_beginner_page_is_plain_thai_and_uses_the_json():
     assert set(payload["candles"]) >= {"BTC", "ETH"}
     assert payload["positions"]
     assert payload["equity"]["BTC"] and payload["equity"]["ETH"]
+    trend = [row for row in payload["positions"] if row["strategy"] == "trend_vol"]
+    assert trend
+    assert all(row["timeframe"] == "1d" for row in trend)
+    assert all("เงินสมมติ" in row["name_th"] for row in trend)
+    assert "trend_vol|1d" in payload["equity"]["BTC"]
+
+
+def test_trend_vol_page_is_plain_thai_and_says_paper_money():
+    html = (ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "docs" / "dashboard.js").read_text(encoding="utf-8")
+    assert "คะแนนเทรนด์ + เป้าความแกว่ง 40%" in html
+    assert "เงินสมมติเท่านั้น" in html
+    assert 'id="term-trend"' in html
+    assert "trend_vol" in js
+    assert "ถือบางส่วน" in js
+    node = shutil.which("node")
+    assert node
+    script = r"""
+const path = require("path");
+const dash = require(path.resolve("docs/dashboard.js"));
+const partial = dash.holdingOf({side: "partial", weight: 0.37});
+if (partial.klass !== "partial" || partial.title.indexOf("ถือบางส่วน") === -1) process.exit(2);
+if (partial.title.indexOf("37%") === -1) process.exit(3);
+if (partial.caption.indexOf("เงินสมมติ") === -1) process.exit(4);
+const full = dash.holdingOf({side: "long", weight: 1});
+if (full.title !== "ถือเหรียญ" || full.klass !== "coin") process.exit(5);
+const cash = dash.holdingOf({side: "cash", weight: 0});
+if (cash.title !== "ถือเงินสด") process.exit(6);
+const info = dash.strategyInfo("trend_vol", "1d");
+if (info.title.indexOf("40%") === -1 || info.caption.indexOf("เงินสมมติ") === -1) process.exit(7);
+"""
+    completed = subprocess.run([node, "-e", script], cwd=ROOT, check=False, capture_output=True, text=True)
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+
+
+def test_dashboard_payload_includes_the_paper_trend_strategy(tmp_path):
+    conn = connect(tmp_path / "lab.sqlite")
+    bars = _market(260, start="2024-01-01")
+    sync_paper(conn, {"BTC": bars, "ETH": bars.copy()}, start="2024-06-01")
+    set_meta(conn, "price_as_of", "2024-09-16")
+    write_dashboard(conn, {"BTC": bars, "ETH": bars.copy()}, folder=tmp_path / "docs")
+    data = json.loads((tmp_path / "docs" / "data" / "dashboard.json").read_text(encoding="utf-8"))
+    trend = [row for row in data["positions"] if row["strategy"] == "trend_vol"]
+    assert len(trend) == 2
+    assert {row["timeframe"] for row in trend} == {"1d"}
+    assert all("เงินสมมติ" in row["name_th"] for row in trend)
+    reason = next(row for row in data["reasons"] if row["strategy"] == "trend_vol")
+    assert "เงินสมมติ" in reason["why_th"]
+    assert "trend_vol|1d" in data["equity"]["BTC"]
+    assert "trend_vol|4h" not in data["equity"]["BTC"]
 
 
 def test_weekly_sma_filter_is_not_on_the_paper_dashboard(tmp_path):

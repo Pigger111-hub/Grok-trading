@@ -34,6 +34,14 @@ const STRATEGY_INFO = {
     token1d: "--s-don-1d",
     token4h: "--s-don-4h",
   },
+  trend_vol: {
+    title: "คะแนนเทรนด์ + เป้าความแกว่ง 40%",
+    short: "คะแนนเทรนด์",
+    caption: "เงินสมมติเท่านั้น ถือบางส่วนตาม 5 กติกา แล้วลดขนาดเมื่อราคาแกว่งแรงกว่า 40% ต่อปี ไม่ได้ส่งคำสั่งจริง",
+    href: "#term-trend",
+    token1d: "--s-trend-1d",
+    token4h: "--s-trend-1d",
+  },
   buy_and_hold: {
     title: "ซื้อแล้วถือเฉยๆ",
     short: "ซื้อแล้วถือ",
@@ -192,6 +200,16 @@ function describeGap(value, benchmark) {
 }
 
 function holdingOf(row) {
+  const weight = Number(row.weight);
+  const partial = row.side === "partial" || row.side_th === "ถือบางส่วน";
+  if (partial) {
+    const pct = Number.isFinite(weight) ? " " + Math.round(weight * 100) + "%" : "";
+    return {
+      title: "ถือบางส่วน" + pct,
+      caption: "เงินสมมติบางส่วนอยู่ในเหรียญ ที่เหลือเป็นเงินสด ราคาขึ้นลงมีผลแค่ส่วนที่ถือ",
+      klass: "partial",
+    };
+  }
   if (row.side === "long" || row.side_th === "ถือเหรียญ") {
     return {
       title: "ถือเหรียญ",
@@ -900,6 +918,7 @@ function plainHistoryName(row) {
     sma_filter: row.timeframe === "4h" ? "เส้นค่าเฉลี่ย 200 แท่ง (SMA 200)" : "เส้นค่าเฉลี่ย 200 วัน (SMA 200)",
     macd: "แมคดี (MACD)",
     donchian: "กรอบดอนเชียน (Donchian)",
+    trend_vol: "คะแนนเทรนด์ + เป้าความแกว่ง 40% (เงินสมมติ)",
     sma_cross: "เส้นค่าเฉลี่ยสั้นตัดเส้นยาว",
     rsi: "ดัชนีแรงสัมพัทธ์ (ซื้อเมื่อถูก ขายเมื่อแพง)",
     bollinger: "แถบโบลลินเจอร์ (ซื้อขอบล่าง ขายตรงกลาง)",
@@ -1329,5 +1348,7 @@ if (typeof module !== "undefined" && module.exports) {
     rankMoves,
     recentTradeEvents,
     headlineCounts,
+    holdingOf,
+    strategyInfo,
   };
 }

@@ -18,6 +18,7 @@ from crypto_lab.engine import run_backtest
 from crypto_lab.research import backtest_window
 from crypto_lab.strategies import STRATEGIES_BY_ID
 from crypto_lab.timeframes import hold_daily_signal
+from crypto_lab.weights import REBALANCE_BAND, TARGET_VOL, VOL_LOOKBACK, run_weight_backtest, trend_vol_weight
 
 # Chosen from round 1, not from the largest full-sample profit.
 # Donchian made the most money on all of BTC and then lost the latest 30%.
@@ -47,6 +48,17 @@ PAPER_BOOK = (
             "ใส่ไว้ในสมุดกระดาษเพื่อดูว่าช่วงหลังจะเป็นอย่างที่นอกตัวอย่างบอกหรือไม่"
         ),
     },
+    {
+        "id": "trend_vol",
+        "kind": "weight",
+        "params": {"target_vol": TARGET_VOL, "lookback": VOL_LOOKBACK, "band": REBALANCE_BAND},
+        "why_th": (
+            "เงินสมมติเท่านั้น ไม่ได้ส่งคำสั่งจริง. "
+            "คะแนนเทรนด์ 5 กติกา คูณเป้าความแกว่ง 40% ต่อปี วัดจาก 30 วันที่ผ่านมา "
+            "ถือได้ไม่เกิน 100% และปรับเมื่อห่างจากเป้าอย่างน้อย 10% ของพอร์ต. "
+            "พารามิเตอร์ล็อกตามการทดลองที่ 11 ไม่ได้จูนใหม่ ใส่สมุดกระดาษเพื่อเดินบนราคาที่ยังไม่เกิด"
+        ),
+    },
 )
 
 
@@ -73,6 +85,51 @@ def _run_one(bars: pd.DataFrame, strategy_id: str, params: dict, start: str):
     return result
 
 
+def _clocks_for(spec: dict, intraday) -> tuple[str, ...]:
+    """The trend weight stays on the daily rule. It is not retimed onto 4-hour bars."""
+    if spec.get("kind") == "weight":
+        return ("1d",)
+    if intraday is not None:
+        return ("1d", "4h")
+    return ("1d",)
+
+
+def _run_weight_book(daily_bars, params: dict, start: str, intraday_bars=None):
+    """Fractional book. The target is the daily experiment-11 weight.
+
+    With no 4-hour tape, the fill is the next daily open, same as run_weight_backtest.
+    With a 4-hour tape, the daily weight is held until the next daily close and the
+    same engine fills it on that tape. Costs are charged on the traded fraction.
+    """
+    band = float(params["band"])
+    daily_weight = trend_vol_weight(
+        daily_bars,
+        target_vol=float(params["target_vol"]),
+        lookback=int(params["lookback"]),
+    )
+    if intraday_bars is None:
+        start_i = _start_index(daily_bars, start)
+        window = daily_bars.iloc[start_i:]
+        return run_weight_backtest(window, daily_weight.iloc[start_i:], band=band), daily_bars
+    start_i = _start_index(intraday_bars, start)
+    window = intraday_bars.iloc[start_i:]
+    held = hold_daily_signal(daily_weight, intraday_bars.index).iloc[start_i:]
+    return run_weight_backtest(window, held, band=band), intraday_bars
+
+
+def _position_side(kind: str | None, cash: float, units: float, last_price: float) -> str:
+    if kind != "weight":
+        return "long" if units > 0 else "cash"
+    market = units * last_price
+    account = cash + market
+    share = market / account if account > 0 else 0.0
+    if share <= 1e-8:
+        return "cash"
+    if share >= 0.999:
+        return "long"
+    return "partial"
+
+
 def _run_clock(daily_bars, intraday_bars, strategy_id: str, params: dict, timeframe: str, start: str):
     """`1d` on a 4-hour tape changes position only after the daily close."""
     if intraday_bars is None or timeframe == "4h":
@@ -95,9 +152,10 @@ def sync_paper(
 ) -> None:
     """Replace the paper book. Same candles produce the same rows.
 
-    When 4-hour bars are provided, each selected strategy is simulated twice:
+    When 4-hour bars are provided, each all-in strategy is simulated twice:
     once with a 4-hour signal, and once with the daily signal held flat until
-    the next daily close. The job itself is expected to run every 4 hours.
+    the next daily close. The trend-score weight is the daily rule only.
+    The job itself is expected to run every 4 hours. Nothing here sends an order.
     """
     specs = list(PAPER_BOOK) + [
         {
@@ -106,7 +164,6 @@ def sync_paper(
             "why_th": "ตัวเทียบซื้อแล้วถือ ไม่ใช่กลยุทธ์ที่ถูกเลือก แต่ต้องมีไว้บนกราฟ",
         }
     ]
-    clocks = ("1d", "4h") if intraday is not None else ("1d",)
     conn.execute("DELETE FROM paper_strategies")
     conn.execute("DELETE FROM paper_equity")
     conn.execute("DELETE FROM paper_trades")
@@ -125,17 +182,20 @@ def sync_paper(
                 0 if spec["id"] == "buy_and_hold" else 1,
             )
             for spec in specs
-            for clock in clocks
+            for clock in _clocks_for(spec, intraday)
             if not (spec["id"] == "buy_and_hold" and clock == "1d" and intraday is not None)
         ],
     )
     for asset, daily_bars in assets.items():
         intra = None if intraday is None else intraday[asset]
         for spec in specs:
-            for clock in clocks:
+            for clock in _clocks_for(spec, intraday):
                 if spec["id"] == "buy_and_hold" and clock == "1d" and intraday is not None:
                     continue
-                result, bars = _run_clock(daily_bars, intra, spec["id"], spec["params"], clock, start)
+                if spec.get("kind") == "weight":
+                    result, bars = _run_weight_book(daily_bars, spec["params"], start, intra)
+                else:
+                    result, bars = _run_clock(daily_bars, intra, spec["id"], spec["params"], clock, start)
                 conn.executemany(
                     "INSERT INTO paper_equity(asset, timeframe, strategy, date, equity) VALUES(?, ?, ?, ?, ?)",
                     [
@@ -180,7 +240,7 @@ def sync_paper(
                         result.final_cash,
                         last_price,
                         result.final_units * last_price,
-                        "long" if result.final_units > 0 else "cash",
+                        _position_side(spec.get("kind"), result.final_cash, result.final_units, last_price),
                         _stamp(bars.index[-1]),
                     ),
                 )
