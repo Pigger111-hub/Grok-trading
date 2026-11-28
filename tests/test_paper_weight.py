@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from crypto_lab.assumptions import PAPER_CASH_ANNUAL_YIELD
 from crypto_lab.engine import run_backtest
 from crypto_lab.research import backtest_window
 from crypto_lab.strategies import STRATEGIES_BY_ID
@@ -122,6 +123,7 @@ def test_paper_trend_vol_matches_the_weight_engine_on_the_same_daily_bars(tmp_pa
         bars.iloc[start_i:],
         trend_vol_weight(bars).iloc[start_i:],
         band=REBALANCE_BAND,
+        cash_annual_yield=PAPER_CASH_ANNUAL_YIELD,
     )
     rows = conn.execute(
         """
@@ -159,7 +161,12 @@ def test_paper_trend_vol_on_the_4h_tape_matches_the_held_daily_weight(tmp_path):
 
     start_i = start_index(intra, start)
     held = hold_daily_signal(trend_vol_weight(daily), intra.index).iloc[start_i:]
-    expected = run_weight_backtest(intra.iloc[start_i:], held, band=REBALANCE_BAND)
+    expected = run_weight_backtest(
+        intra.iloc[start_i:],
+        held,
+        band=REBALANCE_BAND,
+        cash_annual_yield=PAPER_CASH_ANNUAL_YIELD,
+    )
     rows = conn.execute(
         """
         SELECT date, equity FROM paper_equity
@@ -226,6 +233,7 @@ def test_binary_paper_strategies_still_match_the_all_in_engine(tmp_path):
         {"window": 200},
         start_i,
         len(bars),
+        cash_annual_yield=PAPER_CASH_ANNUAL_YIELD,
     )
     rows = conn.execute(
         """

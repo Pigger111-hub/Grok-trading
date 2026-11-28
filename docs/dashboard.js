@@ -202,11 +202,12 @@ function describeGap(value, benchmark) {
 function holdingOf(row) {
   const weight = Number(row.weight);
   const partial = row.side === "partial" || row.side_th === "ถือบางส่วน";
+  const yieldNote = row.strategy === "buy_and_hold" ? "" : " คิดดอกเบี้ยสมมติ 4% ไม่ใช่ดอกเบี้ยจริง";
   if (partial) {
     const pct = Number.isFinite(weight) ? " " + Math.round(weight * 100) + "%" : "";
     return {
       title: "ถือบางส่วน" + pct,
-      caption: "เงินสมมติบางส่วนอยู่ในเหรียญ ที่เหลือเป็นเงินสด ราคาขึ้นลงมีผลแค่ส่วนที่ถือ",
+      caption: "เงินสมมติบางส่วนอยู่ในเหรียญ ที่เหลือเป็นเงินสด ราคาขึ้นลงมีผลแค่ส่วนที่ถือ" + yieldNote,
       klass: "partial",
     };
   }
@@ -219,7 +220,7 @@ function holdingOf(row) {
   }
   return {
     title: "ถือเงินสด",
-    caption: "ขายเหรียญแล้ว เก็บเป็นดอลลาร์ ราคาขึ้นลงไม่มีผลกับก้อนนี้",
+    caption: "ขายเหรียญแล้ว เก็บเป็นดอลลาร์ ราคาขึ้นลงไม่มีผลกับก้อนนี้" + yieldNote,
     klass: "cash",
   };
 }

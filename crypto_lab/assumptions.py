@@ -20,6 +20,11 @@ INITIAL_CASH = 10_000.0
 PERIODS_PER_YEAR = 365
 CASH_ANNUAL_YIELD = 0.0
 
+# Paper book only. Research tables stay at CASH_ANNUAL_YIELD unless a caller
+# opts in. This 4% is an assumption on cash actually held. It is not interest
+# paid by a bank or an exchange. Buy-and-hold does not use it.
+PAPER_CASH_ANNUAL_YIELD = 0.04
+
 # First 70% of each coin's history is the "in-sample" period. The last 30%
 # is "out-of-sample": we look at it only after the rules are already chosen.
 IN_SAMPLE_FRACTION = 0.70

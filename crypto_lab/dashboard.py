@@ -16,6 +16,8 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from crypto_lab.assumptions import PAPER_CASH_ANNUAL_YIELD
+
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 
@@ -38,6 +40,12 @@ NAMES_TH = {
     "bollinger": "โบลลินเจอร์ (Bollinger)",
     "dca_weekly": "ทยอยซื้อ 52 สัปดาห์ (DCA)",
 }
+
+
+def cash_yield_note() -> str:
+    """Thai label for the paper book's assumed cash yield. Not a bank rate."""
+    percent = int(round(PAPER_CASH_ANNUAL_YIELD * 100))
+    return f"ดอกเบี้ยสมมติ {percent}% ต่อปีบนเงินสดที่ถืออยู่จริง ไม่ใช่ดอกเบี้ยจริง"
 
 
 def _bangkok_now() -> str:
@@ -192,6 +200,7 @@ def build_payload(conn: sqlite3.Connection, prices: dict[str, pd.DataFrame]) -> 
         "updated_bangkok": _bangkok_now(),
         "price_as_of": as_of["value"] if as_of else None,
         "disclaimer": "นี่คือการจำลองเท่านั้น ไม่มีคำสั่งซื้อขายจริง และไม่ใช้ API key",
+        "cash_yield_note": cash_yield_note(),
         "candles": candles,
         "markers": markers,
         "equity": equity,

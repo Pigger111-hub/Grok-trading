@@ -12,12 +12,14 @@ Timing is the same as the main engine: a weight on today's row may use today's
 close, and the order is filled at the NEXT bar's open.
 """
 
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
 
 from crypto_lab.assumptions import FEE_RATE, INITIAL_CASH, PERIODS_PER_YEAR, SLIPPAGE_RATE
+from crypto_lab.engine import _elapsed_days, cash_growth_factor
 from crypto_lab.indicators import sma
 from crypto_lab.metrics import compute_metrics
 from crypto_lab.strategies import donchian_signal
@@ -96,15 +98,22 @@ def run_weight_backtest(
     slippage_rate: float = SLIPPAGE_RATE,
     band: float = REBALANCE_BAND,
     periods_per_year: int | None = None,
+    cash_annual_yield: float = 0.0,
 ) -> WeightResult:
     """Hold `weight` of the account in the asset. Long only, no leverage.
 
     The order uses yesterday's weight and today's open. To avoid paying fees
     on tiny adjustments, it only trades when the held share is at least `band`
     away from the target, or when the target is exactly zero.
+
+    cash_annual_yield is opt-in and defaults to 0. After the open fill it
+    compounds only on cash still held, including the uninvested fraction of a
+    partial position. Today's weight cannot turn that yield on or off.
     """
     if not isinstance(bars.index, pd.DatetimeIndex):
         raise TypeError("bars must be indexed by date")
+    if not math.isfinite(cash_annual_yield) or cash_annual_yield <= -1.0:
+        raise ValueError("cash_annual_yield must be finite and greater than -100%")
     target = pd.Series(weight).reindex(bars.index).to_numpy(dtype=float)
     opens = bars["open"].to_numpy(dtype=float)
     closes = bars["close"].to_numpy(dtype=float)
@@ -118,6 +127,7 @@ def run_weight_backtest(
     trades: list[dict] = []
     episode = None
     dates = bars.index
+    elapsed_days = _elapsed_days(dates) if cash_annual_yield != 0.0 else None
 
     for i in range(n):
         if i > 0 and not np.isnan(target[i - 1]) and opens[i] > 0:
@@ -158,6 +168,13 @@ def run_weight_backtest(
                         }
                     )
                     episode = None
+        # Yield follows the position after today's open fill. That fill used
+        # yesterday's weight, so today's close cannot turn the yield on or off.
+        # The round-trip return was recorded at the fill, before this accrual.
+        # Cash still held — the whole account, or only the uninvested fraction —
+        # earns the day. Coins do not.
+        if elapsed_days is not None and cash > 0.0:
+            cash *= cash_growth_factor(cash_annual_yield, float(elapsed_days[i]))
         equity[i] = cash + units * closes[i]
         held[i] = units * closes[i] / equity[i] if equity[i] > 0 else 0.0
 

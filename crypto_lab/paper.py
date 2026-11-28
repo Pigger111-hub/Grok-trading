@@ -13,7 +13,7 @@ import sqlite3
 
 import pandas as pd
 
-from crypto_lab.assumptions import PAPER_START
+from crypto_lab.assumptions import PAPER_CASH_ANNUAL_YIELD, PAPER_START
 from crypto_lab.engine import run_backtest
 from crypto_lab.research import backtest_window
 from crypto_lab.strategies import STRATEGIES_BY_ID
@@ -75,13 +75,27 @@ def _start_index(bars: pd.DataFrame, start: str) -> int:
     return max(position - 1, 0)
 
 
+def _paper_yield(strategy_id: str) -> float:
+    """Assumed yield on cash the paper book actually holds. Buy-and-hold stays at 0%."""
+    if strategy_id == "buy_and_hold":
+        return 0.0
+    return PAPER_CASH_ANNUAL_YIELD
+
+
 def _run_one(bars: pd.DataFrame, strategy_id: str, params: dict, start: str):
     start_i = _start_index(bars, start)
     if strategy_id == "buy_and_hold":
         window = bars.iloc[start_i:]
-        return run_backtest(window, pd.Series(1.0, index=window.index))
+        return run_backtest(window, pd.Series(1.0, index=window.index), cash_annual_yield=0.0)
     strategy = STRATEGIES_BY_ID[strategy_id]
-    result, _benchmark = backtest_window(bars, strategy, params, start_i, len(bars))
+    result, _benchmark = backtest_window(
+        bars,
+        strategy,
+        params,
+        start_i,
+        len(bars),
+        cash_annual_yield=_paper_yield(strategy_id),
+    )
     return result
 
 
@@ -107,14 +121,23 @@ def _run_weight_book(daily_bars, params: dict, start: str, intraday_bars=None):
         target_vol=float(params["target_vol"]),
         lookback=int(params["lookback"]),
     )
+    yield_rate = _paper_yield("trend_vol")
     if intraday_bars is None:
         start_i = _start_index(daily_bars, start)
         window = daily_bars.iloc[start_i:]
-        return run_weight_backtest(window, daily_weight.iloc[start_i:], band=band), daily_bars
+        return (
+            run_weight_backtest(
+                window, daily_weight.iloc[start_i:], band=band, cash_annual_yield=yield_rate
+            ),
+            daily_bars,
+        )
     start_i = _start_index(intraday_bars, start)
     window = intraday_bars.iloc[start_i:]
     held = hold_daily_signal(daily_weight, intraday_bars.index).iloc[start_i:]
-    return run_weight_backtest(window, held, band=band), intraday_bars
+    return (
+        run_weight_backtest(window, held, band=band, cash_annual_yield=yield_rate),
+        intraday_bars,
+    )
 
 
 def _position_side(kind: str | None, cash: float, units: float, last_price: float) -> str:
@@ -138,10 +161,10 @@ def _run_clock(daily_bars, intraday_bars, strategy_id: str, params: dict, timefr
     start_i = _start_index(intraday_bars, start)
     window = intraday_bars.iloc[start_i:]
     if strategy_id == "buy_and_hold":
-        return run_backtest(window, pd.Series(1.0, index=window.index)), intraday_bars
+        return run_backtest(window, pd.Series(1.0, index=window.index), cash_annual_yield=0.0), intraday_bars
     daily_signal = STRATEGIES_BY_ID[strategy_id].generate(daily_bars, **params)
     held = hold_daily_signal(daily_signal, intraday_bars.index).iloc[start_i:]
-    return run_backtest(window, held), intraday_bars
+    return run_backtest(window, held, cash_annual_yield=_paper_yield(strategy_id)), intraday_bars
 
 
 def sync_paper(
@@ -156,6 +179,11 @@ def sync_paper(
     once with a 4-hour signal, and once with the daily signal held flat until
     the next daily close. The trend-score weight is the daily rule only.
     The job itself is expected to run every 4 hours. Nothing here sends an order.
+
+    Every strategy except buy-and-hold accrues PAPER_CASH_ANNUAL_YIELD on cash
+    still held after the next-open fill, including the uninvested fraction of
+    the trend-vol book. That rate is an assumption, not interest that was paid.
+    Buy-and-hold stays at 0%. Fees and slippage are unchanged.
     """
     specs = list(PAPER_BOOK) + [
         {
